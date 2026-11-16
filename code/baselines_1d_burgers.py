@@ -326,6 +326,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--data-dir", type=str, default="datasets/pdebench_burgers")
     parser.add_argument("--train-samples", type=int, default=512)
     parser.add_argument("--test-samples", type=int, default=128)
+    parser.add_argument("--dev-samples", type=int, default=250)
     parser.add_argument("--steps", type=int, default=4000)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--lr", type=float, default=1.0e-3)
@@ -349,6 +350,7 @@ def main() -> None:
     if args.quick:
         args.train_samples = 16
         args.test_samples = 8
+        args.dev_samples = 8
         args.steps = 10
         args.batch_size = 4
         args.log_every = 5
@@ -367,7 +369,14 @@ def main() -> None:
         data_dir / "burgers_nu0.01_test.parquet",
         args.test_samples,
     ).to(device)
-    print(f"train {tuple(train_fields.shape)}  test {tuple(test_fields.shape)}")
+    dev_fields = load_split(
+        data_dir / "burgers_nu0.01_dev.parquet",
+        args.dev_samples,
+    ).to(device)
+    print(
+        f"train {tuple(train_fields.shape)}  dev {tuple(dev_fields.shape)}  "
+        f"test {tuple(test_fields.shape)}"
+    )
 
     test_target = test_fields[..., 0]
     time_mean = test_target.mean(dim=2, keepdim=True).expand_as(test_target)
@@ -382,15 +391,19 @@ def main() -> None:
         train_l2 = evaluate_fno(
             result["model"], train_fields, device, args.batch_size
         )
+        dev_l2 = evaluate_fno(
+            result["model"], dev_fields, device, args.batch_size
+        )
     else:
         result = train_deeponet(train_fields, args, device)
         test_l2 = evaluate_deeponet(result["model"], test_fields, device)
         train_l2 = evaluate_deeponet(result["model"], train_fields, device)
+        dev_l2 = evaluate_deeponet(result["model"], dev_fields, device)
 
     parameters = count_parameters(result["model"])
     print(
         f"model={args.model}  params={parameters}  "
-        f"train_L2={train_l2:.4f}  test_L2={test_l2:.4f}  "
+        f"train_L2={train_l2:.4f}  dev_L2={dev_l2:.4f}  test_L2={test_l2:.4f}  "
         f"seconds={result['seconds']:.1f}"
     )
 
@@ -411,10 +424,12 @@ def main() -> None:
             "query_points": args.query_points,
             "train_samples": args.train_samples,
             "test_samples": args.test_samples,
+            "dev_samples": args.dev_samples,
             "seed": args.seed,
         },
         "parameter_count": parameters,
         "train_relative_l2": train_l2,
+        "dev_relative_l2": dev_l2,
         "test_relative_l2": test_l2,
         "trivial_time_mean_l2": floor,
         "training_seconds": result["seconds"],
