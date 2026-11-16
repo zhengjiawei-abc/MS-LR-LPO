@@ -30,7 +30,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from demo_burgers_dataset import (
+from burgers_common import (
     configure_backend,
     count_parameters,
     load_split,
