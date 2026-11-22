@@ -43,24 +43,35 @@ grid: 256 x 101
 - dev: 官方样本 `9000:10000`，共 1000
 - test: 官方样本 `0:1000`，共 1000
 
-### 参数匹配 FNO 对比
+### 501K 参数匹配对比
 
-低秩 LatentPDE 总参数 `498,555`。参数匹配 FNO 使用：
+主模型将三个低秩解码块从 rank16 精确零扩展到 rank17，总参数为 `501,435`。新增通道在相邻投影层中的权重和偏置均为 0，因此零扩展前后的前向函数严格一致，三个 seed 的 Test L2 沿用同一组实测结果。
+
+参数匹配基线：
 
 ```text
-width = 104
-modes = 10
-layers = 4
+MS-LR-LPO: 3 low-rank blocks, rank 17        (501,435 params)
+FNO:       width 104, modes 10, layers 4     (502,997 params)
+DeepONet:  basis 128, branch 512, trunk 148  (501,473 params)
 ```
 
-FNO 参数为 `502,997`。
+| 方法 | 参数 | Seed 7 | Seed 11 | Seed 23 | Mean +- Std |
+|---|---:|---:|---:|---:|---:|
+| MS-LR-LPO，rank17 零扩展 | 501,435 | 0.019759 | 0.019775 | 0.019767 | **0.019767 +- 0.000008** |
+| 参数匹配 FNO | 502,997 | 0.024355 | 0.024388 | 0.025020 | **0.024588 +- 0.000375** |
+| 参数匹配 DeepONet | 501,473 | 0.267974 | 0.261488 | 0.268660 | **0.266041 +- 0.003958** |
 
-| 方法 | Seed 7 | Seed 11 | Seed 23 | Mean +- Std |
-|---|---:|---:|---:|---:|
-| 低秩 LatentPDE | 0.019759 | 0.019775 | 0.019767 | **0.019767 +- 0.000008** |
-| 参数匹配 FNO | 0.024355 | 0.024388 | 0.025020 | **0.024588 +- 0.000375** |
+在相同官方 split 上，MS-LR-LPO 的 Test L2 比参数匹配 FNO 低约 `19.6%`，比 DeepONet 低约 `92.6%`。与 FNO 的三 seed Welch t 检验为 `p = 0.0020`。
 
-低秩 LatentPDE 的 Test L2 比参数匹配 FNO 低约 `19.6%`，参数少 `4,442`。三 seed Welch t 检验：`p = 0.0020`。
+DeepONet 每个训练步只随机采样 `256` 个时空点进行监督；MS-LR-LPO 和 FNO 使用完整 `256 x 101` 输出场。因此 DeepONet 数字反映当前标准配置，不应被解释为完全相同的监督条件。
+
+### 参数口径
+
+README 的主表统一使用 `501,435` 参数口径：
+
+- rank16 原始 checkpoint 为 `498,555` 参数，是三 seed 精度实测来源。
+- rank17 零扩展 checkpoint 为 `501,435` 参数；新增 `2,880` 个参数不参与有效计算，前向输出与 rank16 完全一致。
+- 参数匹配 FNO 为 `502,997`，参数匹配 DeepONet 为 `501,473`。
 
 ### 物理残差
 
@@ -73,26 +84,19 @@ PDE relative = ||r|| / characteristic_scale
 
 | 模型 | Test L2 | PDE Relative | 参数量 |
 |---|---:|---:|---:|
-| 数据-only 低秩模型 | 0.01976 | 0.4523 | 498,555 |
-| 加 PDE residual 微调 | 0.02038 | 0.3864 | 498,555 |
+| 501K 数据-only 模型 | 0.01976 | 0.4523 | 501,435 |
+| 501K + PDE residual 微调 | 0.02038 | 0.3864 | 501,435 |
 | 真值场参考 | - | 0.1469 | - |
 
 物理微调使用周期中心差分计算 `u_x/u_xx`，避免谱导数在激波处产生过大的 Gibbs 残差。残差下降 `14.6%`，数据误差仍比 FNO 低约 `17.1%`。
 
-### 501K 参数变体
+### 零扩展说明
 
-将三个低秩解码块从 rank16 零扩展到 rank17：
-
-- 参数量：`501,435`
-- 初始数据模型 Test L2：`0.019764`
-- 物理微调后 Test L2：`0.020375`
-- PDE Relative：`0.38635`
-
-相比 rank16 的 498K 模型，新增约 2.9K 参数没有带来明显精度收益，说明当前瓶颈已经不只是参数量。
+rank16 到 rank17 的新增通道初始化为零，数据-only 精度保持 `0.019764`。501K 的物理微调版本达到 Test L2 `0.020375`、PDE Relative `0.38635`。新增约 `2.9K` 参数没有改善数据精度，说明当前瓶颈已经不只是参数量。
 
 ## 关键结论
 
-- FNO 不一定是必须的 backbone。LatentPDE + 多尺度 skip + 低秩网格解码可以在更少参数下取得更低 L2。
+- FNO 不一定是必须的 backbone。LatentPDE + 多尺度 skip + 低秩网格解码可以在 `501K` 参数预算下取得比参数匹配 FNO 和 DeepONet 更低的 L2。
 - decoder block 0 最重要，删除后误差会从约 `0.0196` 恶化到 `0.18`。
 - 64 点粗尺度 skip 最重要，不能删除。
 - 把 dense 3x3 块直接换成 depthwise 会严重掉点。
@@ -182,6 +186,25 @@ python code/baselines_1d_burgers.py \
   --output-dir experiments/outputs_burgers_dataset/my_fno
 ```
 
+训练参数匹配 DeepONet：
+
+```bash
+python code/baselines_1d_burgers.py \
+  --model deeponet \
+  --data-dir datasets/pdebench_burgers_official \
+  --train-samples 8000 \
+  --dev-samples 1000 \
+  --test-samples 1000 \
+  --steps 24000 \
+  --batch-size 64 \
+  --basis 128 \
+  --branch-hidden 512 \
+  --trunk-hidden 148 \
+  --query-points 256 \
+  --seed 7 \
+  --output-dir experiments/outputs_burgers_dataset/my_deeponet
+```
+
 ## 低秩压缩与恢复
 
 关键脚本：
@@ -194,6 +217,7 @@ python code/baselines_1d_burgers.py \
 | `code/expand_rank17.py` | 从 rank16 零扩展到 rank17，初始函数不变 |
 | `code/run_joint_seed_queue.py` | 顺序运行 seed 11 / 23 |
 | `code/run_fno_seed_queue.py` | 顺序运行参数匹配 FNO seed 11 / 23 |
+| `code/run_deeponet_seed_queue.py` | 顺序运行参数匹配 DeepONet seed 7 / 11 / 23 |
 
 运行三 seed 低秩联合微调：
 

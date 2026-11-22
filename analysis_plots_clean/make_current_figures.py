@@ -147,7 +147,7 @@ def architecture_diagram():
     box(2.45, 4.55, 2.45, 1.45, "Context encoder", "CNN + Transformer\n32 context tokens", "#e7f0f2")
     box(2.45, 2.1, 2.45, 1.45, "Manifold encoder", "96 channels x 64 latent points", "#e7f0f2")
     box(5.55, 2.1, 2.35, 1.45, "LatentPDE", "9 time anchors\nspectral evolution + nonlinearity", "#fff1dc")
-    box(8.55, 2.1, 2.5, 1.45, "Low-rank grid decoder", "3 SVD blocks, rank 16\n+ Fourier x/t features", "#e9f4ea")
+    box(8.55, 2.1, 2.5, 1.45, "Low-rank grid decoder", "3 SVD blocks, rank 17\n+ Fourier x/t features", "#e9f4ea")
     box(11.65, 2.1, 2.15, 1.45, "u(x,t)", "256 x 101 field", LIGHT, GRID)
     box(8.55, 5.2, 2.5, 1.0, "Multi-scale skips", "256 / 128 / 64 features\ntime-gated fusion", "#f8e9ed")
     box(11.65, 4.75, 2.15, 1.1, "PDE residual", "u_t + u u_x - nu u_xx\noptional soft constraint", "#f8e9ed")
@@ -161,7 +161,7 @@ def architecture_diagram():
     arrow((8.55, 5.7), (9.8, 3.55), color=ACCENT, dashed=True)
     arrow((12.7, 3.55), (12.7, 4.75), color=ACCENT, dashed=True)
 
-    axis.text(6.8, 1.35, "Parameters: 498,555", fontsize=11, color=MODEL, fontweight="bold")
+    axis.text(6.8, 1.35, "Parameters: 501,435", fontsize=11, color=MODEL, fontweight="bold")
     axis.text(6.8, 1.02, "Matched FNO: 502,997", fontsize=10, color=FNO, fontweight="bold")
     axis.text(
         6.8,
@@ -270,7 +270,7 @@ def performance_comparison():
     axis.text(0.0210, 3.55, "● Matched FNO", color=FNO, fontsize=9.5, fontweight="bold")
     axis.set_title(
         "Lower Test error at a slightly smaller parameter budget\n"
-        "498,555 vs 502,997 parameters   |   Welch p = 0.0020",
+        "501,435 vs 502,997 parameters   |   Welch p = 0.0020",
         pad=18,
         fontsize=14,
         linespacing=1.55,
