@@ -10,7 +10,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.lines import Line2D
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
 
@@ -189,33 +188,93 @@ def performance_comparison():
     seeds = ["Seed 7", "Seed 11", "Seed 23", "Mean"]
     model_values = model + [float(np.mean(model))]
     fno_values = fno + [float(np.mean(fno))]
-    x = np.arange(len(seeds))
-    width = 0.34
+    y = np.array([3.0, 2.0, 1.0, 0.0])
 
-    fig, axis = plt.subplots(figsize=(10.5, 5.8))
-    style_axis(axis)
-    axis.bar(x - width / 2, model_values, width, color=MODEL, label="MS-LR-LPO")
-    axis.bar(x + width / 2, fno_values, width, color=FNO, label="Matched FNO")
-    axis.set_ylim(0.015, 0.028)
-    axis.set_ylabel("Relative Test L2")
-    axis.set_title("MS-LR-LPO consistently outperforms parameter-matched FNO", pad=16, fontsize=14)
-    axis.set_xticks(x, seeds)
-    axis.legend(frameon=False, loc="upper left")
-    for index, value in enumerate(model_values):
-        axis.text(index - width / 2, value + 0.00025, f"{value:.4f}", ha="center", fontsize=8.5)
-    for index, value in enumerate(fno_values):
-        axis.text(index + width / 2, value + 0.00025, f"{value:.4f}", ha="center", fontsize=8.5)
-    axis.axvspan(3 - 0.48, 3 + 0.48, color="#f4f7fa", zorder=0)
-    axis.text(
-        0.72,
-        0.95,
-        "Parameters: 498,555 vs 502,997\nImprovement: 19.6%\nWelch p = 0.0020",
-        transform=axis.transAxes,
-        fontsize=9.5,
-        va="top",
-        bbox={"boxstyle": "round,pad=0.45", "facecolor": "white", "edgecolor": GRID},
+    fig, axis = plt.subplots(figsize=(10.5, 5.5))
+    axis.spines["top"].set_visible(False)
+    axis.spines["right"].set_visible(False)
+    axis.spines["left"].set_visible(False)
+    axis.grid(axis="x", color=GRID, linewidth=0.8, alpha=0.85)
+    axis.set_axisbelow(True)
+    axis.axhspan(-0.42, 0.42, color="#f4f7fa", zorder=0)
+
+    for row, model_value, fno_value in zip(y, model_values, fno_values):
+        axis.plot(
+            [model_value, fno_value],
+            [row, row],
+            color="#b9c4cf",
+            linewidth=3,
+            solid_capstyle="round",
+            zorder=1,
+        )
+        axis.scatter(
+            model_value,
+            row,
+            s=95,
+            color=MODEL,
+            edgecolor="white",
+            linewidth=1.5,
+            zorder=3,
+        )
+        axis.scatter(
+            fno_value,
+            row,
+            s=95,
+            color=FNO,
+            edgecolor="white",
+            linewidth=1.5,
+            zorder=3,
+        )
+        axis.text(
+            model_value - 0.00018,
+            row,
+            f"{model_value:.4f}",
+            ha="right",
+            va="center",
+            fontsize=9,
+            color=MODEL,
+            fontweight="bold",
+        )
+        axis.text(
+            fno_value + 0.00018,
+            row,
+            f"{fno_value:.4f}",
+            ha="left",
+            va="center",
+            fontsize=9,
+            color=FNO,
+            fontweight="bold",
+        )
+
+    mean_model = model_values[-1]
+    mean_fno = fno_values[-1]
+    axis.annotate(
+        "19.6% lower error",
+        xy=((mean_model + mean_fno) / 2, 0.28),
+        xytext=((mean_model + mean_fno) / 2, 0.72),
+        ha="center",
+        fontsize=9,
+        color=INK,
+        arrowprops={"arrowstyle": "-", "color": "#9aa6b2", "linewidth": 1},
+        bbox={"boxstyle": "round,pad=0.3", "facecolor": "white", "edgecolor": GRID},
+        zorder=4,
     )
-    fig.tight_layout()
+
+    axis.set_xlim(0.0189, 0.0257)
+    axis.set_ylim(-0.7, 3.8)
+    axis.set_yticks(y, seeds)
+    axis.set_xlabel("Relative Test L2, lower is better")
+    axis.tick_params(axis="y", length=0, pad=12)
+
+    axis.text(0.0190, 3.55, "● MS-LR-LPO", color=MODEL, fontsize=9.5, fontweight="bold")
+    axis.text(0.0210, 3.55, "● Matched FNO", color=FNO, fontsize=9.5, fontweight="bold")
+    axis.set_title(
+        "Lower Test error at a slightly smaller parameter budget\n"
+        "498,555 vs 502,997 parameters   |   Welch p = 0.0020",
+        pad=18,
+        fontsize=14,
+        linespacing=1.55,
+    )
     fig.savefig(OUT / "performance_comparison.png", dpi=260, bbox_inches="tight")
     plt.close(fig)
 
