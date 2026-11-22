@@ -22,6 +22,18 @@ t in [0, 2]
 grid: 256 x 101
 ```
 
+## 项目图
+
+![MS-LR-LPO architecture](analysis_plots_clean/architecture_diagram.png)
+
+![MS-LR-LPO performance comparison](analysis_plots_clean/performance_comparison.png)
+
+![MS-LR-LPO ablation study](analysis_plots_clean/ablation_study.png)
+
+![PDEBench Burgers dataset analysis](analysis_plots_clean/dataset_analysis.png)
+
+![MS-LR-LPO training curves](analysis_plots_clean/training_curves.png)
+
 ## 当前结果
 
 所有结果使用 PDEBench 官方 Burgers `Nu=0.01` 数据：
@@ -222,6 +234,7 @@ experiments/outputs_burgers_dataset/official_n8000/
 | `datasets/download_parallel.py` | 大文件并发可恢复下载 |
 | `datasets/pdebench_burgers_to_parquet.py` | 官方 HDF5 转项目 parquet |
 | `datasets/find_pdebench_sample.py` | 在 HDF5 中定位 parquet 样本 |
+| `analysis_plots_clean/make_current_figures.py` | 生成 README 中当前项目的 5 张图 |
 
 ## 已知限制
 
