@@ -1,4 +1,6 @@
-# Multimodal Neural Operators
+# 多尺度低秩潜空间 PDE 神经算子
+
+**Multi-Scale Low-Rank Latent PDE Operator (MS-LR-LPO)**
 
 用于学习一维 Burgers 方程解算子的神经算子项目。当前主线模型采用：
 
