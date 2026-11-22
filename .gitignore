@@ -66,3 +66,8 @@ Thumbs.db
 # Temp
 *.tmp
 temp/
+tmp/
+
+# Local Python bootstrap
+.uv-cache/
+.uv-python/

@@ -31,9 +31,19 @@ def predict_full(model, fields: torch.Tensor, device, batch: int = 8) -> torch.T
     out = []
     for s in range(0, fields.size(0), batch):
         u0 = fields[s:s + batch, :, 0, 0]
-        kv = model.context(u0)
+        if model.grid_decoder is not None:
+            out.append(model.forward_grid(u0))
+            continue
+        kv, trajectory = model.encode(u0)
         b = u0.size(0)
-        out.append(model.decode(kv, x.expand(b, -1, -1), t.expand(b, -1, -1)).view(b, NX, NT))
+        out.append(
+            model.decode(
+                kv,
+                x.expand(b, -1, -1),
+                t.expand(b, -1, -1),
+                trajectory,
+            ).view(b, NX, NT)
+        )
     model.train()
     return torch.cat(out)
 
@@ -48,6 +58,9 @@ def main() -> None:
     p.add_argument("--steps", type=int, default=24000)
     p.add_argument("--batch-size", type=int, default=32)
     p.add_argument("--points", type=int, default=256)
+    p.add_argument("--loss-mode", choices=("points", "full"), default="points")
+    p.add_argument("--grid-chunk", type=int, default=8)
+    p.add_argument("--recon-weight", type=float, default=0.0)
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--weight-decay", type=float, default=1e-4)
     p.add_argument("--warmup", type=int, default=500)
@@ -55,6 +68,7 @@ def main() -> None:
     p.add_argument("--grad-clip", type=float, default=1.0)
     p.add_argument("--eval-every", type=int, default=1000)
     p.add_argument("--seed", type=int, default=7)
+    p.add_argument("--data-dir", type=Path, default=DATA_DIR)
     p.add_argument("--output-dir", type=Path, required=True)
     p.add_argument("--save-model", action="store_true")
     p.add_argument("--quick", action="store_true")
@@ -63,19 +77,24 @@ def main() -> None:
     args = p.parse_args()
     if args.quick:
         args.train_samples, args.steps, args.eval_every = 32, 60, 30
+    args.grid_chunk = max(1, args.grid_chunk)
 
     set_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     configure_backend(device)
-    train = load_split(DATA_DIR / "burgers_nu0.01_train_000.parquet", args.train_samples).to(device)
-    dev = load_split(DATA_DIR / "burgers_nu0.01_dev.parquet", 10**6).to(device)
-    test = load_split(DATA_DIR / "burgers_nu0.01_test.parquet", 10**6).to(device)
+    train = load_split(args.data_dir / "burgers_nu0.01_train_000.parquet", args.train_samples).to(device)
+    dev = load_split(args.data_dir / "burgers_nu0.01_dev.parquet", 10**6).to(device)
+    test = load_split(args.data_dir / "burgers_nu0.01_test.parquet", 10**6).to(device)
     if args.quick:
         dev, test = dev[:16], test[:16]
     print(f"train {tuple(train.shape)} dev {tuple(dev.shape)} test {tuple(test.shape)}", flush=True)
 
     cfg = OperatorConfig(**{k: getattr(args, k) for k in OperatorConfig.__dataclass_fields__})
     model = CoordAttentionOperator(cfg).to(device)
+    if args.recon_weight > 0.0 and model.dynamics is None:
+        raise ValueError("--recon-weight requires latent dynamics")
+    if args.recon_weight > 0.0 and model.dynamics.encoder.decode is None:
+        raise ValueError("--recon-weight requires --latent-recon true")
     print(f"params {count_parameters(model)}", flush=True)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
@@ -92,14 +111,57 @@ def main() -> None:
     started = time.time()
     for step in range(args.steps):
         idx = torch.randint(0, train.size(0), (args.batch_size,), device=device)
-        xi = torch.randint(0, NX, (args.batch_size, args.points), device=device)
-        ti = torch.randint(0, NT, (args.batch_size, args.points), device=device)
-        fields = train[idx, :, :, 0]
-        target = fields[torch.arange(args.batch_size, device=device)[:, None], xi, ti]
-        pred = model(fields[:, :, 0], x_axis[xi, ti].unsqueeze(-1), t_axis[xi, ti].unsqueeze(-1))
-        loss = torch.mean((pred - target) ** 2)
         opt.zero_grad(set_to_none=True)
-        loss.backward()
+        if args.loss_mode == "full":
+            fields = train[idx, :, :, 0]
+            target = fields
+            if model.grid_decoder is not None:
+                prediction = model.forward_grid(fields[:, :, 0])
+                loss = torch.mean((prediction - target) ** 2)
+                if args.recon_weight > 0.0:
+                    reconstruction = model.reconstruct(fields[:, :, 0])
+                    loss = loss + args.recon_weight * torch.mean(
+                        (reconstruction - fields[:, :, 0]) ** 2
+                    )
+                loss.backward()
+                total_points = target.numel()
+                loss_value = float(loss.detach())
+            else:
+                context, trajectory = model.encode(fields[:, :, 0])
+                total_points = target.numel()
+                loss_value = 0.0
+                for start in range(0, args.batch_size, args.grid_chunk):
+                    stop = min(start + args.grid_chunk, args.batch_size)
+                    count = stop - start
+                    prediction = model.decode(
+                        context[start:stop],
+                        x_axis.reshape(1, -1, 1).expand(count, -1, -1),
+                        t_axis.reshape(1, -1, 1).expand(count, -1, -1),
+                        trajectory[start:stop] if trajectory is not None else None,
+                    ).view(count, NX, NT)
+                    loss_chunk = torch.sum((prediction - target[start:stop]) ** 2)
+                    loss_value += float(loss_chunk.detach())
+                    (loss_chunk / total_points).backward(
+                        retain_graph=stop < args.batch_size
+                    )
+                loss = torch.tensor(loss_value / total_points, device=device)
+        else:
+            xi = torch.randint(0, NX, (args.batch_size, args.points), device=device)
+            ti = torch.randint(0, NT, (args.batch_size, args.points), device=device)
+            fields = train[idx, :, :, 0]
+            target = fields[torch.arange(args.batch_size, device=device)[:, None], xi, ti]
+            pred = model(fields[:, :, 0], x_axis[xi, ti].unsqueeze(-1), t_axis[xi, ti].unsqueeze(-1))
+            loss = torch.mean((pred - target) ** 2)
+            if args.recon_weight > 0.0:
+                reconstruction = model.reconstruct(fields[:, :, 0])
+                loss = loss + args.recon_weight * torch.mean(
+                    (reconstruction - fields[:, :, 0]) ** 2
+                )
+        if not torch.isfinite(loss):
+            print(f"step {step + 1:6d} skipped non-finite loss", flush=True)
+            continue
+        if args.loss_mode != "full":
+            loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
         opt.step()
         sched.step()
@@ -118,7 +180,11 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     run_cfg = {k: (str(v) if isinstance(v, Path) else v) for k, v in vars(args).items()}
     (args.output_dir / "metrics.json").write_text(json.dumps({
-        "model": "coord_attention", "config": run_cfg, "operator": asdict(cfg),
+        "model": (
+            "coord_attention_latent_pde"
+            if cfg.dynamics == "latent_pde"
+            else "coord_attention"
+        ), "config": run_cfg, "operator": asdict(cfg),
         "parameter_count": count_parameters(model), "best_step": best_step,
         "train_relative_l2": res["train_l2"], "dev_relative_l2": res["dev_l2"],
         "test_relative_l2": res["test_l2"], "test_samples": test.size(0),
