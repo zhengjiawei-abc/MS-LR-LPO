@@ -1,6 +1,6 @@
 """PDEBench 1D Burgers (Nu0.01) 的公共工具：网格常数、数据加载、随机种子、误差。
 
-网格约定（用 code/check_grid.py 以伪谱求解器复现数据验证）：
+网格约定经官方 PDEBench parquet 数据核对：
   u_t + u u_x = NU u_xx,  x ∈ [0, 1) 周期,  t ∈ [0, 2],  NU = 0.01 / π
 parquet 是原始 1024 × 201 网格降采样后的 256 × 101：x_i = i / 256，t_j = 2 j / 100。
 """
