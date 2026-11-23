@@ -17,7 +17,7 @@ from pathlib import Path
 import torch
 
 from burgers_common import (NT, NX, configure_backend, count_parameters, grid_coordinates,
-                            load_split, relative_l2, set_seed)
+                            load_split, relative_l2, resolve_split_path, set_seed)
 from coord_attention_operator import CoordAttentionOperator, OperatorConfig
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "datasets" / "pdebench_burgers"
@@ -69,6 +69,11 @@ def main() -> None:
     p.add_argument("--eval-every", type=int, default=1000)
     p.add_argument("--seed", type=int, default=7)
     p.add_argument("--data-dir", type=Path, default=DATA_DIR)
+    p.add_argument("--dataset-prefix", default="burgers_nu0.01")
+    p.add_argument("--dev-samples", type=int, default=10**6)
+    p.add_argument("--test-samples", type=int, default=10**6)
+    p.add_argument("--init-checkpoint", type=Path)
+    p.add_argument("--evaluate-only", action="store_true")
     p.add_argument("--output-dir", type=Path, required=True)
     p.add_argument("--save-model", action="store_true")
     p.add_argument("--quick", action="store_true")
@@ -82,15 +87,94 @@ def main() -> None:
     set_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     configure_backend(device)
-    train = load_split(args.data_dir / "burgers_nu0.01_train_000.parquet", args.train_samples).to(device)
-    dev = load_split(args.data_dir / "burgers_nu0.01_dev.parquet", 10**6).to(device)
-    test = load_split(args.data_dir / "burgers_nu0.01_test.parquet", 10**6).to(device)
+    train_path = resolve_split_path(args.data_dir, args.dataset_prefix, "train")
+    dev_path = resolve_split_path(args.data_dir, args.dataset_prefix, "dev")
+    test_path = resolve_split_path(args.data_dir, args.dataset_prefix, "test")
+    train = load_split(train_path, args.train_samples).to(device)
+    dev = load_split(dev_path, args.dev_samples).to(device)
+    test = load_split(test_path, args.test_samples).to(device)
     if args.quick:
         dev, test = dev[:16], test[:16]
     print(f"train {tuple(train.shape)} dev {tuple(dev.shape)} test {tuple(test.shape)}", flush=True)
 
-    cfg = OperatorConfig(**{k: getattr(args, k) for k in OperatorConfig.__dataclass_fields__})
+    checkpoint = None
+    if args.init_checkpoint is not None:
+        checkpoint = torch.load(
+            args.init_checkpoint,
+            map_location=device,
+            weights_only=False,
+        )
+    if args.evaluate_only and checkpoint is not None:
+        known_fields = OperatorConfig.__dataclass_fields__
+        operator = {
+            key: value
+            for key, value in checkpoint["operator"].items()
+            if key in known_fields
+        }
+        operator["grid_transport_velocity"] = args.grid_transport_velocity
+        operator["grid_transport_blend"] = args.grid_transport_blend
+        cfg = OperatorConfig(**operator)
+    else:
+        cfg = OperatorConfig(
+            **{
+                key: getattr(args, key)
+                for key in OperatorConfig.__dataclass_fields__
+            }
+        )
     model = CoordAttentionOperator(cfg).to(device)
+    if checkpoint is not None:
+        incompatible = model.load_state_dict(checkpoint["state_dict"], strict=False)
+        missing = [
+            key
+            for key in incompatible.missing_keys
+            if not key.startswith("transport_")
+        ]
+        if missing:
+            raise ValueError(f"missing checkpoint keys: {missing}")
+        print(
+            f"initialized from {args.init_checkpoint} "
+            f"({len(incompatible.unexpected_keys)} unused keys)",
+            flush=True,
+        )
+    if args.evaluate_only:
+        if args.init_checkpoint is None:
+            raise ValueError("--evaluate-only requires --init-checkpoint")
+        result = {
+            "train_relative_l2": evaluate(model, train[:256], device),
+            "dev_relative_l2": evaluate(model, dev, device),
+            "test_relative_l2": evaluate(model, test, device),
+        }
+        print(
+            f"evaluate-only: dev {result['dev_relative_l2']:.6f} "
+            f"test {result['test_relative_l2']:.6f}",
+            flush=True,
+        )
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+        (args.output_dir / "metrics.json").write_text(
+            json.dumps(
+                {
+                    "model": "coord_attention_latent_pde",
+                    "evaluation_only": True,
+                    "config": {
+                        name: (
+                            str(value) if isinstance(value, Path) else value
+                        )
+                        for name, value in vars(args).items()
+                    },
+                    "operator": asdict(cfg),
+                    "parameter_count": count_parameters(model),
+                    **result,
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        if args.save_model:
+            torch.save(
+                {"state_dict": model.state_dict(), "operator": asdict(cfg)},
+                args.output_dir / "model.pt",
+            )
+        return
     if args.recon_weight > 0.0 and model.dynamics is None:
         raise ValueError("--recon-weight requires latent dynamics")
     if args.recon_weight > 0.0 and model.dynamics.encoder.decode is None:
@@ -179,12 +263,23 @@ def main() -> None:
           f"test(all {test.size(0)}) {res['test_l2']:.4f}", flush=True)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     run_cfg = {k: (str(v) if isinstance(v, Path) else v) for k, v in vars(args).items()}
+    metadata_path = args.data_dir / "metadata.json"
+    dataset_metadata = (
+        json.loads(metadata_path.read_text(encoding="utf-8"))
+        if metadata_path.exists()
+        else {}
+    )
     (args.output_dir / "metrics.json").write_text(json.dumps({
         "model": (
             "coord_attention_latent_pde"
             if cfg.dynamics == "latent_pde"
             else "coord_attention"
         ), "config": run_cfg, "operator": asdict(cfg),
+        "dataset": {
+            "prefix": args.dataset_prefix,
+            "metadata": dataset_metadata,
+            "time_normalization": "101 uniform snapshots mapped to model domain [0, 2]",
+        },
         "parameter_count": count_parameters(model), "best_step": best_step,
         "train_relative_l2": res["train_l2"], "dev_relative_l2": res["dev_l2"],
         "test_relative_l2": res["test_l2"], "test_samples": test.size(0),

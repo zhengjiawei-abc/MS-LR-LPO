@@ -1,12 +1,12 @@
-"""坐标查询交叉注意力算子：u0(x) -> u(x, t)。
+"""多尺度潜空间 PDE 算子：u0(x) -> u(x, t)。
 
   KV：初值 u0 的上下文序列。卷积干路提取局部特征，按 token_count 个空间位置池化，
       加上可学习位置编码后经 Transformer 编码器做 token 间的自注意力。
   Q ：只来自物理坐标。x 用周期 Fourier 特征，t 用 Fourier 特征，
       分别投影后相加得到时空坐标嵌入；不拼接任何来自 u0 的信息。
-  解码：若干层 [坐标 Q 对上下文 KV 的交叉注意力 + FFN]，再经 MLP 头输出 u(x, t)。
+  解码：支持坐标查询解码和低秩网格解码，可选周期常速平移物理分支。
 
-坐标为物理单位：x ∈ [0, 1) 周期，t ∈ [0, 2]（见 burgers_common）。
+默认坐标为物理单位：x ∈ [0, 1) 周期，t ∈ [0, 2]（见 burgers_common）。
 """
 from __future__ import annotations
 
@@ -48,6 +48,8 @@ class OperatorConfig:
     grid_last_depthwise: bool = False
     grid_last_rank: int = 0
     grid_lowrank_rank: int = 0
+    grid_transport_velocity: float = 0.0
+    grid_transport_blend: float = 0.0
 
 
 class CoordinateEmbedding(nn.Module):
@@ -512,6 +514,20 @@ class CoordAttentionOperator(nn.Module):
                 nn.Linear(cfg.d_model, 1),
             )
         )
+        if cfg.grid_transport_velocity != 0.0:
+            x = torch.arange(NX).float()
+            t = torch.linspace(0.0, T_FINAL, NT)
+            position = (
+                x[:, None]
+                - cfg.grid_transport_velocity
+                * t[None, :]
+                * NX
+                / X_LENGTH
+            ).remainder(NX)
+            x0 = torch.floor(position).long()
+            self.register_buffer("transport_x0", x0)
+            self.register_buffer("transport_x1", (x0 + 1).remainder(NX))
+            self.register_buffer("transport_frac", position - x0.float())
 
     def encode(self, u0: torch.Tensor):
         return self.context(u0), (
@@ -553,7 +569,18 @@ class CoordAttentionOperator(nn.Module):
         if self.grid_decoder is None:
             raise ValueError("grid decoder is not enabled")
         context, trajectory, skip_features = self.encode_with_skips(u0)
-        return self.grid_decoder(trajectory, context, skip_features)
+        field = self.grid_decoder(trajectory, context, skip_features)
+        velocity = self.cfg.grid_transport_velocity
+        if velocity == 0.0:
+            return field
+        source = u0.unsqueeze(-1).expand(-1, -1, NT)
+        index0 = self.transport_x0.unsqueeze(0).expand(u0.size(0), -1, -1)
+        index1 = self.transport_x1.unsqueeze(0).expand(u0.size(0), -1, -1)
+        lower = torch.gather(source, 1, index0)
+        upper = torch.gather(source, 1, index1)
+        transport = lower + self.transport_frac * (upper - lower)
+        blend = self.cfg.grid_transport_blend
+        return transport + blend * (field - transport)
 
     def reconstruct(self, u0: torch.Tensor) -> torch.Tensor:
         if self.dynamics is None:

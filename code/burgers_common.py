@@ -57,6 +57,19 @@ def load_split(path: Path, max_samples: int) -> torch.Tensor:
     return torch.from_numpy(np.stack(samples, axis=0))
 
 
+def resolve_split_path(data_dir: Path, prefix: str, split: str) -> Path:
+    """Resolve a dataset split while keeping the original Burgers filename."""
+    data_dir = Path(data_dir)
+    names = [f"{prefix}_{split}.parquet"]
+    if split == "train":
+        names.insert(0, f"{prefix}_train_000.parquet")
+    for name in names:
+        path = data_dir / name
+        if path.exists():
+            return path
+    raise FileNotFoundError(f"no {split} parquet for {prefix} in {data_dir}")
+
+
 def relative_l2(prediction: torch.Tensor, target: torch.Tensor) -> float:
     """逐样本相对 L2 的平均。两者形状为 [N, ...]。"""
     error = torch.linalg.vector_norm((prediction - target).flatten(1), dim=1)

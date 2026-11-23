@@ -1,83 +1,115 @@
-# 多尺度低秩潜空间 PDE 神经算子
+# 物理引导多尺度低秩潜空间 PDE 神经算子
 
-**Multi-Scale Low-Rank Latent PDE Operator (MS-LR-LPO)**
+**Physics-Guided Multi-Scale Low-Rank Latent PDE Operator (PG-MS-LR-LPO)**
 
-用于学习一维 Burgers 方程解算子的神经算子项目。当前主线模型采用：
+当前标准模型是在原 MS-LR-LPO 上加入可选周期常速平移分支的物理引导神经算子。
+主线流程为：
 
 ```text
 u0(x) -> context encoder
-      -> LatentPDE 时间演化
-      -> 多尺度 skip connection
-      -> 低秩二维网格解码器
+      -> LatentPDE time evolution
+      -> multi-scale skips
+      -> low-rank grid decoder
+      -> physics-guided transport fusion
       -> u(x, t)
-```
-
-目标方程：
-
-```text
-u_t + u u_x = nu u_xx
-nu = 0.01 / pi
-x in [0, 1), periodic
-t in [0, 2]
-grid: 256 x 101
 ```
 
 ## 项目图
 
-![MS-LR-LPO architecture](analysis_plots_clean/architecture_diagram.png)
+![PG-MS-LR-LPO architecture](analysis_plots_clean/architecture_diagram.png)
 
-![MS-LR-LPO performance comparison](analysis_plots_clean/performance_comparison.png)
+![PG-MS-LR-LPO cross-PDE performance](analysis_plots_clean/performance_comparison.png)
 
-![MS-LR-LPO ablation study](analysis_plots_clean/ablation_study.png)
+![Base operator ablation study](analysis_plots_clean/ablation_study.png)
 
 ![PDEBench Burgers dataset analysis](analysis_plots_clean/dataset_analysis.png)
 
-![MS-LR-LPO training curves](analysis_plots_clean/training_curves.png)
+![Base operator training curves](analysis_plots_clean/training_curves.png)
 
-## 当前结果
+## 标准模型
 
-所有结果使用 PDEBench 官方 Burgers `Nu=0.01` 数据：
-
-- 官方 HDF5 下载后按 `x[::4], t[::2]` 转为 `256 x 101`
-- train: 官方样本 `1000:9000`，共 8000
-- dev: 官方样本 `9000:10000`，共 1000
-- test: 官方样本 `0:1000`，共 1000
-
-### 501K 参数匹配对比
-
-主模型将三个低秩解码块从 rank16 精确零扩展到 rank17，总参数为 `501,435`。新增通道在相邻投影层中的权重和偏置均为 0，因此零扩展前后的前向函数严格一致，三个 seed 的 Test L2 沿用同一组实测结果。
-
-参数匹配基线：
+神经算子输出记为 `u_n`。当任务已知周期常速平流系数 `beta` 时，模型额外构造：
 
 ```text
-MS-LR-LPO: 3 low-rank blocks, rank 17        (501,435 params)
-FNO:       width 104, modes 10, layers 4     (502,997 params)
-DeepONet:  basis 128, branch 512, trunk 148  (501,473 params)
+u_p(x, t) = u0((x - beta * t) mod 1)
+
+u(x, t) = u_p(x, t)
+          + alpha * (u_n(x, t) - u_p(x, t))
 ```
 
-| 方法 | 参数 | Seed 7 | Seed 11 | Seed 23 | Mean +- Std |
-|---|---:|---:|---:|---:|---:|
-| MS-LR-LPO，rank17 零扩展 | 501,435 | 0.019759 | 0.019775 | 0.019767 | **0.019767 +- 0.000008** |
-| 参数匹配 FNO | 502,997 | 0.024355 | 0.024388 | 0.025020 | **0.024588 +- 0.000375** |
-| 参数匹配 DeepONet | 501,473 | 0.267974 | 0.261488 | 0.268660 | **0.266041 +- 0.003958** |
+当前 advection 基准使用 `alpha = 0`。平移分支使用周期边界和线性插值，不增加可训练参数。
+Burgers 和 diffusion-sorption 没有已知常速平移项，因此关闭该分支，模型退化为原 MS-LR-LPO。
 
-在相同官方 split 上，MS-LR-LPO 的 Test L2 比参数匹配 FNO 低约 `19.6%`，比 DeepONet 低约 `92.6%`。与 FNO 的三 seed Welch t 检验为 `p = 0.0020`。
+这个分支是物理先验，不是对所有 PDE 都生效的通用加速器。Burgers 的输运速度依赖局部解 `u`，
+不能直接复用常数 `beta`。
 
-DeepONet 每个训练步只随机采样 `256` 个时空点进行监督；MS-LR-LPO 和 FNO 使用完整 `256 x 101` 输出场。因此 DeepONet 数字反映当前标准配置，不应被解释为完全相同的监督条件。
+## 主要结果
 
-补充的高监督对照把 seed 7 的随机点从 `256` 提高到 `4096`：Test L2 为 `0.250013`，比标准版改善约 `6.7%`，但仍比 501K MS-LR-LPO 的 `0.019759` 高约 `12.7` 倍，训练耗时也从 `57.6s` 增至 `582.1s`。监督点不足只能解释一部分差距。
+所有结果使用 PDEBench 官方数据，采用相同划分：
 
-### 参数口径
+- train: `8000`
+- dev: `1000`
+- test: `1000`
+- 下表为 seed 7，评价指标为 full-grid relative Test L2
 
-README 的主表统一使用 `501,435` 参数口径：
+| 数据集 | 原 MS-LR-LPO | PG-MS-LR-LPO | FNO | DeepONet |
+|---|---:|---:|---:|---:|
+| Burgers `Nu=0.01` | 0.019759 | **0.019758** | 0.024355 | 0.267974 |
+| 1D diffusion-sorption | 0.003312 | **0.003310** | 0.701194 | 0.014917 |
+| 1D advection `beta=1.0` | 0.017053 | **0.004543** | 0.013649 | 0.440765 |
 
-- rank16 原始 checkpoint 为 `498,555` 参数，是三 seed 精度实测来源。
-- rank17 零扩展 checkpoint 为 `501,435` 参数；新增 `2,880` 个参数不参与有效计算，前向输出与 rank16 完全一致。
-- 参数匹配 FNO 为 `502,997`，参数匹配 DeepONet 为 `501,473`。
+物理引导模型相对两个参数匹配 baseline：
 
-### 物理残差
+| 数据集 | 比 FNO 低 | 比 DeepONet 低 |
+|---|---:|---:|
+| Burgers | 18.87% | 92.63% |
+| Diffusion-sorption | 99.53% | 77.81% |
+| Advection | 66.72% | 98.97% |
 
-从 seed 7 数据模型继续加入归一化输出场 Burgers 残差：
+DeepONet 每个训练步只随机采样 `256` 个时空点进行监督；PG-MS-LR-LPO 和 FNO 使用完整
+`256 x 101` 输出场。因此 DeepONet 数字反映当前标准配置，不应被解释为完全相同的监督条件。
+
+## Advection 改进
+
+Advection 原模型 Test L2 为 `0.017053`。单纯从 12K checkpoint 继续训练 6K 后降至
+`0.015620`，仍落后 FNO。启用周期平移分支后：
+
+```text
+Test L2 = 0.004543
+```
+
+相比原模型降低约 `73.4%`，相比 FNO 降低约 `66.7%`。
+
+平移速度只在 dev 的 `0.98..1.02` 范围内搜索，dev 最优值为 `1.0`，没有使用 test 调参。
+线性插值在 dev 上优于 Fourier shift 和三次插值，因此作为标准实现。
+
+## Burgers 三 seed
+
+关闭平移分支后，PG-MS-LR-LPO 与 Burgers 原模型等价。三 seed Test L2：
+
+| 方法 | Seed 7 | Seed 11 | Seed 23 | Mean +- Std |
+|---|---:|---:|---:|---:|
+| PG-MS-LR-LPO，平移分支关闭 | 0.019759 | 0.019775 | 0.019767 | **0.019767 +- 0.000008** |
+| 参数匹配 FNO | 0.024355 | 0.024388 | 0.025020 | 0.024588 +- 0.000375 |
+| 参数匹配 DeepONet | 0.267974 | 0.261488 | 0.268660 | 0.266041 +- 0.003958 |
+
+与 FNO 的三 seed Welch t 检验为 `p = 0.0020`。
+
+## 参数口径
+
+| 模型 | 参数量 | 说明 |
+|---|---:|---|
+| PG-MS-LR-LPO | 501,435 | rank17 低秩解码器，标准参数口径 |
+| Burgers 原 checkpoint | 498,555 | rank16，三 seed 精度实测来源 |
+| 参数匹配 FNO | 502,997 | width 104, modes 10, layers 4 |
+| 参数匹配 DeepONet | 501,473 | basis 128, branch 512, trunk 148 |
+
+周期平移分支不使用可训练参数。Burgers 表中新模型使用 rank16 checkpoint，向 rank17 的零扩展
+不会改变前向函数，因此与 `501,435` 输出严格一致。
+
+## 物理残差
+
+Burgers 可选物理残差微调：
 
 ```text
 r = u_t + u u_x - nu u_xx
@@ -86,31 +118,15 @@ PDE relative = ||r|| / characteristic_scale
 
 | 模型 | Test L2 | PDE Relative | 参数量 |
 |---|---:|---:|---:|
-| 501K 数据-only 模型 | 0.01976 | 0.4523 | 501,435 |
-| 501K + PDE residual 微调 | 0.02038 | 0.3864 | 501,435 |
+| 数据-only 模型 | 0.01976 | 0.4523 | 501,435 |
+| 加 PDE residual 微调 | 0.02038 | 0.3864 | 501,435 |
 | 真值场参考 | - | 0.1469 | - |
 
-物理微调使用周期中心差分计算 `u_x/u_xx`，避免谱导数在激波处产生过大的 Gibbs 残差。残差下降 `14.6%`，数据误差仍比 FNO 低约 `17.1%`。
-
-### 零扩展说明
-
-rank16 到 rank17 的新增通道初始化为零，数据-only 精度保持 `0.019764`。501K 的物理微调版本达到 Test L2 `0.020375`、PDE Relative `0.38635`。新增约 `2.9K` 参数没有改善数据精度，说明当前瓶颈已经不只是参数量。
-
-## 关键结论
-
-- FNO 不一定是必须的 backbone。LatentPDE + 多尺度 skip + 低秩网格解码可以在 `501K` 参数预算下取得比参数匹配 FNO 和 DeepONet 更低的 L2。
-- decoder block 0 最重要，删除后误差会从约 `0.0196` 恶化到 `0.18`。
-- 64 点粗尺度 skip 最重要，不能删除。
-- 把 dense 3x3 块直接换成 depthwise 会严重掉点。
-- 用 SVD 将 dense 块分解为低秩卷积，再从原模型恢复微调，能够保留大部分精度。
-- 全分辨率 latent、联合重建和简单谱块没有稳定收益。
-- 输出场 PDE 残差可以降低物理残差，但会牺牲少量 L2。
+残差下降约 `14.6%`，但数据误差会略有增加。当前标准结果仍以数据-only 模型为准。
 
 ## 数据准备
 
-官方 Burgers `Nu=0.01` 文件约 8.23 GB。当前实验只使用这个粘度，不需要下载全部 12 个粘度文件。
-
-仓库提供并发范围和 MD5 校验下载器：
+### Burgers
 
 ```bash
 python datasets/download_parallel.py \
@@ -118,25 +134,50 @@ python datasets/download_parallel.py \
   --output datasets/pdebench_raw/1D_Burgers_Sols_Nu0.01.hdf5 \
   --md5 e6d9a4f62baf9a29121a816b919e2770 \
   --connections 32
-```
 
-转换为项目 parquet：
-
-```bash
 python datasets/pdebench_burgers_to_parquet.py \
   --input datasets/pdebench_raw/1D_Burgers_Sols_Nu0.01.hdf5 \
   --output-dir datasets/pdebench_burgers_official
 ```
 
-默认划分：
+### Advection
 
-```text
-test  = 0:1000
-train = 1000:9000
-dev   = 9000:10000
+```bash
+python datasets/download_parallel.py \
+  --url https://hf-mirror.com/datasets/pdebench/Advection/resolve/main/1D_Advection_Sols_beta1.0.hdf5 \
+  --output datasets/pdebench_raw/1D_Advection_Sols_beta1.0.hdf5 \
+  --md5 1fe41923a4123db55bf4e89bea32e142 \
+  --connections 32
+
+python datasets/pdebench_group_to_parquet.py \
+  --input datasets/pdebench_raw/1D_Advection_Sols_beta1.0.hdf5 \
+  --output-dir datasets/pdebench_advection_beta1_official \
+  --name advection_beta1 \
+  --parameters beta=1.0 \
+  --t-stride 2 --x-stride 4
 ```
 
-## 训练
+### Diffusion-sorption
+
+```bash
+python datasets/download_parallel.py \
+  --url https://darus.uni-stuttgart.de/api/access/datafile/133020 \
+  --output datasets/pdebench_raw/1D_diff-sorp_NA_NA.h5 \
+  --md5 9d466d1213065619d087319e16d9a938 \
+  --connections 32
+
+python datasets/pdebench_group_to_parquet.py \
+  --input datasets/pdebench_raw/1D_diff-sorp_NA_NA.h5 \
+  --output-dir datasets/pdebench_diff_sorp_official \
+  --name diff_sorp \
+  --parameters D=0.0005 \
+  --t-stride 1 --x-stride 4
+```
+
+Diffusion-sorption 原始时间范围为 `0..500`。项目把 `101` 个均匀时间层映射到模型现有的
+`[0, 2]` 坐标域，仅用于数据-only 学习，不计算 Burgers 物理残差。
+
+## 训练与复现
 
 安装依赖：
 
@@ -145,134 +186,111 @@ pip install -r code/requirements.txt
 pip install torch h5py
 ```
 
-训练坐标解码基线：
+训练基础神经算子：
 
 ```bash
 python code/train_coord_attention.py \
-  --data-dir datasets/pdebench_burgers_official \
+  --data-dir datasets/pdebench_advection_beta1_official \
+  --dataset-prefix advection_beta1 \
   --train-samples 8000 \
-  --steps 24000 \
+  --steps 12000 \
   --batch-size 64 \
   --loss-mode full \
   --output-mode grid \
   --grid-hidden 48 \
   --grid-blocks 3 \
   --grid-length 64 \
+  --grid-lowrank-rank 17 \
   --dynamics latent_pde \
   --latent-channels 96 \
   --latent-length 64 \
   --pde-layers 1 \
   --pde-rank 24 \
   --pde-modes 32 \
+  --pde-substeps 2 \
   --rollout-steps 9 \
   --seed 7 \
   --save-model \
-  --output-dir experiments/outputs_burgers_dataset/my_context_model
+  --output-dir experiments/my_advection_base
 ```
 
-训练参数匹配 FNO：
+启用 advection 周期平移分支并保存标准模型：
+
+```bash
+python code/train_coord_attention.py \
+  --data-dir datasets/pdebench_advection_beta1_official \
+  --dataset-prefix advection_beta1 \
+  --grid-lowrank-rank 17 \
+  --grid-transport-velocity 1.0 \
+  --grid-transport-blend 0.0 \
+  --init-checkpoint experiments/my_advection_base/model.pt \
+  --evaluate-only \
+  --save-model \
+  --output-dir experiments/my_advection_pg
+```
+
+一次运行跨 PDE 四模型矩阵（base、PG、FNO、DeepONet）：
+
+```bash
+python code/run_cross_pde_matrix.py \
+  --seed 7 \
+  --current-steps 12000 \
+  --baseline-steps 24000
+```
+
+参数匹配 FNO：
 
 ```bash
 python code/baselines_1d_burgers.py \
   --model fno \
-  --data-dir datasets/pdebench_burgers_official \
-  --train-samples 8000 \
-  --dev-samples 1000 \
-  --test-samples 1000 \
-  --steps 24000 \
-  --batch-size 64 \
-  --width 104 \
-  --modes 10 \
-  --layers 4 \
+  --data-dir datasets/pdebench_advection_beta1_official \
+  --dataset-prefix advection_beta1 \
+  --train-samples 8000 --dev-samples 1000 --test-samples 1000 \
+  --steps 24000 --batch-size 64 \
+  --width 104 --modes 10 --layers 4 \
   --seed 7 \
-  --output-dir experiments/outputs_burgers_dataset/my_fno
+  --output-dir experiments/my_fno
 ```
 
-训练参数匹配 DeepONet：
+参数匹配 DeepONet：
 
 ```bash
 python code/baselines_1d_burgers.py \
   --model deeponet \
-  --data-dir datasets/pdebench_burgers_official \
-  --train-samples 8000 \
-  --dev-samples 1000 \
-  --test-samples 1000 \
-  --steps 24000 \
-  --batch-size 64 \
-  --basis 128 \
-  --branch-hidden 512 \
-  --trunk-hidden 148 \
+  --data-dir datasets/pdebench_advection_beta1_official \
+  --dataset-prefix advection_beta1 \
+  --train-samples 8000 --dev-samples 1000 --test-samples 1000 \
+  --steps 24000 --batch-size 64 \
+  --basis 128 --branch-hidden 512 --trunk-hidden 148 \
   --query-points 256 \
   --seed 7 \
-  --output-dir experiments/outputs_burgers_dataset/my_deeponet
+  --output-dir experiments/my_deeponet
 ```
 
-## 低秩压缩与恢复
-
-关键脚本：
-
-| 脚本 | 作用 |
-|---|---|
-| `code/finetune_all_lowrank.py` | 将三个 decoder block 做 rank16 SVD 低秩压缩并恢复微调 |
-| `code/finetune_joint_lowrank.py` | 低秩模型全参数联合微调，支持 seed 和 checkpoint |
-| `code/finetune_pde_residual.py` | 加入输出场 Burgers PDE residual |
-| `code/expand_rank17.py` | 从 rank16 零扩展到 rank17，初始函数不变 |
-| `code/run_joint_seed_queue.py` | 顺序运行 seed 11 / 23 |
-| `code/run_fno_seed_queue.py` | 顺序运行参数匹配 FNO seed 11 / 23 |
-| `code/run_deeponet_seed_queue.py` | 顺序运行参数匹配 DeepONet seed 7 / 11 / 23 |
-
-运行三 seed 低秩联合微调：
-
-```bash
-python code/run_joint_seed_queue.py
-```
-
-运行物理残差微调：
-
-```bash
-python code/finetune_pde_residual.py
-```
-
-这些脚本默认读取：
-
-```text
-experiments/outputs_burgers_dataset/official_n8000/
-```
-
-实验输出、checkpoint、训练日志和大数据文件不会提交到 Git。
-
-## 诊断脚本
-
-| 脚本 | 作用 |
-|---|---|
-| `code/diagnose_pde_residual.py` | 比较真值与模型的 PDE residual |
-| `code/diagnose_skip_from_best.py` | 恢复最优 checkpoint，训练 skip 分支并消融 decoder block |
-| `code/diagnose_skip_scales.py` | 分别删除三个 skip 尺度，测量 dev/test 灵敏度 |
-
-## 目录
+## 代码目录
 
 | 路径 | 内容 |
 |---|---|
-| `code/coord_attention_operator.py` | LatentPDE、上下文编码、低秩网格解码和 skip |
-| `code/train_coord_attention.py` | 坐标查询和全网格训练入口 |
-| `code/baselines_1d_burgers.py` | FNO 与 DeepONet 基线 |
-| `code/burgers_common.py` | 数据、网格和误差工具 |
-| `datasets/download_parallel.py` | 大文件并发可恢复下载 |
-| `datasets/pdebench_burgers_to_parquet.py` | 官方 HDF5 转项目 parquet |
-| `datasets/find_pdebench_sample.py` | 在 HDF5 中定位 parquet 样本 |
-| `analysis_plots_clean/make_current_figures.py` | 生成 README 中当前项目的 5 张图 |
+| `code/coord_attention_operator.py` | LatentPDE、上下文编码、低秩解码、skip 和周期平移分支 |
+| `code/train_coord_attention.py` | 训练、checkpoint 加载、evaluate-only 和物理分支配置 |
+| `code/baselines_1d_burgers.py` | 参数匹配 FNO 与 DeepONet |
+| `code/run_cross_pde_matrix.py` | Burgers、advection、diffusion-sorption 四模型矩阵 |
+| `code/burgers_common.py` | 数据读取、split 解析、误差与坐标工具 |
+| `datasets/pdebench_group_to_parquet.py` | 分组和整块 tensor 两种 PDEBench 1D HDF5 转换 |
+| `analysis_plots_clean/make_current_figures.py` | 生成 README 当前图片 |
 
 ## 已知限制
 
-- 当前主结果基于单台 RTX 4060 Laptop GPU。
-- 从已有最优 checkpoint 做低秩恢复约需 30 分钟，完整从零训练成本更高。
-- 物理残差使用有限差分，在激波处仍然很大。
-- 当前三 seed 验证复用同一低秩初始化，只是联合微调 seed 不同。
-- 所有测试结果用于最终报告，模型选择使用独立 dev。
+- 跨 PDE 主矩阵当前使用 seed 7；Burgers 主模型有三 seed 验证。
+- 周期平移分支只适用于已知常速、周期边界的线性平流。
+- Diffusion-sorption 使用归一化时间坐标，不能直接复用 Burgers PDE residual。
+- 当前模型训练成本明显高于 FNO 和 DeepONet。
+- 参数匹配 FNO 在 diffusion-sorption 上的低分是否来自 `modes=10` 的谱表达限制，仍需 modes/width 重分配实验确认。
+- 数据、checkpoint 和实验输出保存在本地 `datasets/` 与 `experiments/`，不提交到 Git。
 
 ## 联系
 
 zhengjiawei-abc  
 1103493759@qq.com
 
-最后更新：2026-11-22
+最后更新：2026-11-23

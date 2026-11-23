@@ -1,4 +1,4 @@
-"""Regenerate documentation figures for the current MS-LR-LPO project."""
+"""Regenerate documentation figures for the current PG-MS-LR-LPO project."""
 from __future__ import annotations
 
 import json
@@ -16,6 +16,7 @@ from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 ROOT = Path(__file__).resolve().parent.parent
 OUT = Path(__file__).resolve().parent
 RUNS = ROOT / "experiments" / "outputs_burgers_dataset" / "official_n8000"
+CROSS = ROOT / "experiments" / "outputs_cross_pde"
 DATA = ROOT / "datasets" / "pdebench_burgers_official"
 
 INK = "#17212b"
@@ -130,7 +131,7 @@ def architecture_diagram():
     axis.text(
         0.55,
         7.05,
-        "MS-LR-LPO: Multi-Scale Low-Rank Latent PDE Operator",
+        "PG-MS-LR-LPO: Physics-Guided Multi-Scale Low-Rank Latent PDE Operator",
         fontsize=18,
         fontweight="bold",
         color=INK,
@@ -138,7 +139,7 @@ def architecture_diagram():
     axis.text(
         0.55,
         6.66,
-        "Current operator for periodic 1D Burgers: u0(x) -> u(x,t)",
+        "Neural latent PDE plus an optional periodic constant-velocity transport prior",
         fontsize=10.5,
         color=MUTED,
     )
@@ -148,9 +149,9 @@ def architecture_diagram():
     box(2.45, 2.1, 2.45, 1.45, "Manifold encoder", "96 channels x 64 latent points", "#e7f0f2")
     box(5.55, 2.1, 2.35, 1.45, "LatentPDE", "9 time anchors\nspectral evolution + nonlinearity", "#fff1dc")
     box(8.55, 2.1, 2.5, 1.45, "Low-rank grid decoder", "3 SVD blocks, rank 17\n+ Fourier x/t features", "#e9f4ea")
-    box(11.65, 2.1, 2.15, 1.45, "u(x,t)", "256 x 101 field", LIGHT, GRID)
+    box(11.65, 2.1, 2.15, 1.45, "u(x,t)", "physics-guided fusion\n256 x 101 field", LIGHT, GRID)
     box(8.55, 5.2, 2.5, 1.0, "Multi-scale skips", "256 / 128 / 64 features\ntime-gated fusion", "#f8e9ed")
-    box(11.65, 4.75, 2.15, 1.1, "PDE residual", "u_t + u u_x - nu u_xx\noptional soft constraint", "#f8e9ed")
+    box(11.65, 4.75, 2.15, 1.0, "Periodic transport", "shift u0 by beta t\nmod 1, periodic boundary", "#f8e9ed")
 
     arrow((1.9, 4.02), (2.45, 5.1))
     arrow((1.9, 4.02), (2.45, 2.82))
@@ -159,14 +160,14 @@ def architecture_diagram():
     arrow((7.9, 2.82), (8.55, 2.82))
     arrow((11.05, 2.82), (11.65, 2.82))
     arrow((8.55, 5.7), (9.8, 3.55), color=ACCENT, dashed=True)
-    arrow((12.7, 3.55), (12.7, 4.75), color=ACCENT, dashed=True)
+    arrow((12.7, 4.75), (12.7, 3.55), color=ACCENT, dashed=True)
 
     axis.text(6.8, 1.35, "Parameters: 501,435", fontsize=11, color=MODEL, fontweight="bold")
     axis.text(6.8, 1.02, "Matched FNO: 502,997", fontsize=10, color=FNO, fontweight="bold")
     axis.text(
         6.8,
         0.55,
-        "Three-seed Test L2: 0.01977 vs 0.02459  |  Welch p = 0.0020",
+        "Test L2: Burgers 0.01976 | diffusion-sorption 0.00331 | advection 0.00454",
         fontsize=11,
         color=INK,
     )
@@ -175,106 +176,63 @@ def architecture_diagram():
 
 
 def performance_comparison():
-    model = [
-        read_json(RUNS / "latent_pde_all_lowrank_joint" / "metrics.json")["final"]["test"],
-        read_json(RUNS / "latent_pde_all_lowrank_joint_s11" / "metrics.json")["final"]["test"],
-        read_json(RUNS / "latent_pde_all_lowrank_joint_s23" / "metrics.json")["final"]["test"],
-    ]
-    fno = [
-        read_json(RUNS / "fno_w104_m10_s7_24k" / "metrics.json")["test_relative_l2"],
-        read_json(RUNS / "fno_w104_m10_s11_24k" / "metrics.json")["test_relative_l2"],
-        read_json(RUNS / "fno_w104_m10_s23_24k" / "metrics.json")["test_relative_l2"],
-    ]
-    seeds = ["Seed 7", "Seed 11", "Seed 23", "Mean"]
-    model_values = model + [float(np.mean(model))]
-    fno_values = fno + [float(np.mean(fno))]
-    y = np.array([3.0, 2.0, 1.0, 0.0])
-
-    fig, axis = plt.subplots(figsize=(10.5, 5.5))
-    axis.spines["top"].set_visible(False)
-    axis.spines["right"].set_visible(False)
-    axis.spines["left"].set_visible(False)
-    axis.grid(axis="x", color=GRID, linewidth=0.8, alpha=0.85)
-    axis.set_axisbelow(True)
-    axis.axhspan(-0.42, 0.42, color="#f4f7fa", zorder=0)
-
-    for row, model_value, fno_value in zip(y, model_values, fno_values):
-        axis.plot(
-            [model_value, fno_value],
-            [row, row],
-            color="#b9c4cf",
-            linewidth=3,
-            solid_capstyle="round",
-            zorder=1,
-        )
-        axis.scatter(
-            model_value,
-            row,
-            s=95,
-            color=MODEL,
-            edgecolor="white",
-            linewidth=1.5,
-            zorder=3,
-        )
-        axis.scatter(
-            fno_value,
-            row,
-            s=95,
-            color=FNO,
-            edgecolor="white",
-            linewidth=1.5,
-            zorder=3,
-        )
-        axis.text(
-            model_value - 0.00018,
-            row,
-            f"{model_value:.4f}",
-            ha="right",
-            va="center",
-            fontsize=9,
-            color=MODEL,
-            fontweight="bold",
-        )
-        axis.text(
-            fno_value + 0.00018,
-            row,
-            f"{fno_value:.4f}",
-            ha="left",
-            va="center",
-            fontsize=9,
-            color=FNO,
-            fontweight="bold",
-        )
-
-    mean_model = model_values[-1]
-    mean_fno = fno_values[-1]
-    axis.annotate(
-        "19.6% lower error",
-        xy=((mean_model + mean_fno) / 2, 0.28),
-        xytext=((mean_model + mean_fno) / 2, 0.72),
-        ha="center",
-        fontsize=9,
-        color=INK,
-        arrowprops={"arrowstyle": "-", "color": "#9aa6b2", "linewidth": 1},
-        bbox={"boxstyle": "round,pad=0.3", "facecolor": "white", "edgecolor": GRID},
-        zorder=4,
+    datasets = ["Burgers", "Diffusion-sorption", "Advection beta=1"]
+    methods = ["Original MS-LR-LPO", "PG-MS-LR-LPO", "FNO", "DeepONet"]
+    colors = ["#7aa6a9", MODEL, FNO, ACCENT]
+    values = np.array(
+        [
+            [
+                read_json(RUNS / "latent_pde_all_lowrank_joint" / "metrics.json")["final"]["test"],
+                read_json(CROSS / "new_model_eval" / "burgers_rank16" / "metrics.json")["test_relative_l2"],
+                read_json(RUNS / "fno_w104_m10_s7_24k" / "metrics.json")["test_relative_l2"],
+                read_json(RUNS / "deeponet_pm501_s7_24k" / "metrics.json")["test_relative_l2"],
+            ],
+            [
+                read_json(CROSS / "full" / "diff_sorp" / "ms_lr_lpo" / "metrics.json")["test_relative_l2"],
+                read_json(CROSS / "new_model_eval" / "diff_sorp" / "metrics.json")["test_relative_l2"],
+                read_json(CROSS / "full" / "diff_sorp" / "fno" / "metrics.json")["test_relative_l2"],
+                read_json(CROSS / "full" / "diff_sorp" / "deeponet" / "metrics.json")["test_relative_l2"],
+            ],
+            [
+                read_json(CROSS / "full" / "advection_beta1" / "ms_lr_lpo" / "metrics.json")["test_relative_l2"],
+                read_json(CROSS / "improve_advection" / "transport_prior" / "metrics.json")["test_relative_l2"],
+                read_json(CROSS / "improve_advection" / "comparison" / "fno" / "metrics.json")["test_relative_l2"],
+                read_json(CROSS / "improve_advection" / "comparison" / "deeponet" / "metrics.json")["test_relative_l2"],
+            ],
+        ]
     )
 
-    axis.set_xlim(0.0189, 0.0257)
-    axis.set_ylim(-0.7, 3.8)
-    axis.set_yticks(y, seeds)
-    axis.set_xlabel("Relative Test L2, lower is better")
-    axis.tick_params(axis="y", length=0, pad=12)
+    fig, axis = plt.subplots(figsize=(13.5, 6.2))
+    style_axis(axis)
+    axis.set_yscale("log")
+    axis.set_ylim(0.002, 3.5)
+    width = 0.18
+    x = np.arange(len(datasets))
+    for index, (method, color) in enumerate(zip(methods, colors)):
+        offset = (index - 1.5) * width
+        bars = axis.bar(x + offset, values[:, index], width, color=color, label=method)
+        for bar, value in zip(bars, values[:, index]):
+            axis.text(
+                bar.get_x() + bar.get_width() / 2,
+                value * 1.14,
+                f"{value:.4f}",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+                color=INK,
+                rotation=90,
+            )
 
-    axis.text(0.0190, 3.55, "● MS-LR-LPO", color=MODEL, fontsize=9.5, fontweight="bold")
-    axis.text(0.0210, 3.55, "● Matched FNO", color=FNO, fontsize=9.5, fontweight="bold")
+    axis.set_xticks(x, datasets)
+    axis.set_ylabel("Relative Test L2 (log scale, lower is better)")
     axis.set_title(
-        "Lower Test error at a slightly smaller parameter budget\n"
-        "501,435 vs 502,997 parameters   |   Welch p = 0.0020",
-        pad=18,
+        "PG-MS-LR-LPO across PDEBench tasks\n"
+        "Standard model: 501,435 params | FNO: 502,997 | DeepONet: 501,473",
+        pad=16,
         fontsize=14,
-        linespacing=1.55,
+        linespacing=1.45,
     )
+    axis.legend(frameon=False, ncol=4, loc="upper center", bbox_to_anchor=(0.5, 1.02))
     fig.savefig(OUT / "performance_comparison.png", dpi=260, bbox_inches="tight")
     plt.close(fig)
 
@@ -318,7 +276,7 @@ def ablation_study():
         axes[1].text(index, value + 0.00002, f"{value:.4f}", ha="center", fontsize=8.5)
     axes[1].tick_params(axis="x", labelsize=8)
 
-    fig.suptitle("Current MS-LR-LPO ablation study", fontsize=15, fontweight="bold")
+    fig.suptitle("Base MS-LR-LPO ablation study", fontsize=15, fontweight="bold")
     fig.tight_layout(rect=(0, 0, 1, 0.94))
     fig.savefig(OUT / "ablation_study.png", dpi=260, bbox_inches="tight")
     plt.close(fig)
@@ -404,7 +362,7 @@ def dataset_analysis():
     axes[2].text(0.12, 0.35, "Project parquet", fontsize=12, fontweight="bold", transform=axes[2].transAxes)
     axes[2].text(0.12, 0.21, "256 x 101 x 1", fontsize=12, color=MODEL, fontweight="bold", transform=axes[2].transAxes)
 
-    fig.suptitle("PDEBench Burgers Nu=0.01 data used by MS-LR-LPO", fontsize=15, fontweight="bold")
+    fig.suptitle("PDEBench Burgers Nu=0.01 data used by the base operator", fontsize=15, fontweight="bold")
     fig.tight_layout(rect=(0, 0, 1, 0.94))
     fig.savefig(OUT / "dataset_analysis.png", dpi=260, bbox_inches="tight")
     plt.close(fig)
@@ -439,7 +397,7 @@ def training_curves():
         axes[0].plot(steps, values, marker="o", markersize=3, linewidth=1.8, color=color, label=label)
     axes[0].set_xlabel("Joint fine-tune step")
     axes[0].set_ylabel("Dev relative L2")
-    axes[0].set_title("MS-LR-LPO convergence")
+    axes[0].set_title("Base MS-LR-LPO convergence")
     axes[0].legend(frameon=False)
     axes[0].axhline(0.024588, color=FNO, linestyle="--", linewidth=1.2, alpha=0.85)
     axes[0].text(500, 0.02475, "FNO 3-seed mean", color=FNO, fontsize=8.5)
@@ -452,7 +410,7 @@ def training_curves():
     axes[1].set_title("Matched FNO training loss")
     axes[1].legend(frameon=False)
 
-    fig.suptitle("Current convergence curves", fontsize=15, fontweight="bold")
+    fig.suptitle("Base operator convergence curves", fontsize=15, fontweight="bold")
     fig.tight_layout(rect=(0, 0, 1, 0.94))
     fig.savefig(OUT / "training_curves.png", dpi=260, bbox_inches="tight")
     plt.close(fig)

@@ -1,19 +1,15 @@
-"""External operator-learning baselines on the 1D Burgers task.
+"""External operator-learning baselines on 1D PDEBench tasks.
 
-The point of this script is to answer a question the hybrid model cannot answer
-from its own ablations: is it actually good, or merely better than its own
-stripped-down variants? Two standard baselines are provided, both trained on the
-same PDEBench splits and scored with the same relative-L2 metric:
+Two standard baselines are trained on the same PDEBench splits and scored with
+the same relative-L2 metric:
 
 * ``fno``      -- Fourier Neural Operator mapping u0 -> u(x, t) on the grid.
 * ``deeponet`` -- branch/trunk network mapping (u0, x, t) -> u(x, t).
 
 A time-mean predictor is also reported as a trivial floor.
 
-Fairness note: FNO is trained with full-field supervision (its standard
-training recipe), while the hybrid model only sees a handful of sampled points
-per trajectory per step. If FNO wins, the honest reading is that the hybrid's
-sparse-supervision setting - not its architecture - is what costs accuracy.
+Fairness note: FNO and the current hybrid model use full-field supervision.
+DeepONet uses 256 random query points per training step unless overridden.
 """
 
 from __future__ import annotations
@@ -34,6 +30,7 @@ from burgers_common import (
     configure_backend,
     count_parameters,
     load_split,
+    resolve_split_path,
     set_seed,
 )
 
@@ -320,10 +317,11 @@ def train_deeponet(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="FNO / DeepONet baselines on 1D Burgers.",
+        description="FNO / DeepONet baselines on 1D PDEBench trajectories.",
     )
     parser.add_argument("--model", choices=("fno", "deeponet"), default="fno")
     parser.add_argument("--data-dir", type=str, default="datasets/pdebench_burgers")
+    parser.add_argument("--dataset-prefix", default="burgers_nu0.01")
     parser.add_argument("--train-samples", type=int, default=512)
     parser.add_argument("--test-samples", type=int, default=128)
     parser.add_argument("--dev-samples", type=int, default=250)
@@ -362,15 +360,15 @@ def main() -> None:
 
     data_dir = Path(args.data_dir)
     train_fields = load_split(
-        data_dir / "burgers_nu0.01_train_000.parquet",
+        resolve_split_path(data_dir, args.dataset_prefix, "train"),
         args.train_samples,
     ).to(device)
     test_fields = load_split(
-        data_dir / "burgers_nu0.01_test.parquet",
+        resolve_split_path(data_dir, args.dataset_prefix, "test"),
         args.test_samples,
     ).to(device)
     dev_fields = load_split(
-        data_dir / "burgers_nu0.01_dev.parquet",
+        resolve_split_path(data_dir, args.dataset_prefix, "dev"),
         args.dev_samples,
     ).to(device)
     print(
@@ -409,8 +407,19 @@ def main() -> None:
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    metadata_path = data_dir / "metadata.json"
+    dataset_metadata = (
+        json.loads(metadata_path.read_text(encoding="utf-8"))
+        if metadata_path.exists()
+        else {}
+    )
     metrics = {
         "model": args.model,
+        "dataset": {
+            "prefix": args.dataset_prefix,
+            "metadata": dataset_metadata,
+            "time_normalization": "101 uniform snapshots mapped to DeepONet coordinates [0, 1]",
+        },
         "config": {
             "steps": args.steps,
             "batch_size": args.batch_size,
