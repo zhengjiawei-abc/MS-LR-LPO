@@ -53,6 +53,10 @@ def fno_command(dataset_dir: Path, prefix: str, output: Path, args) -> list[str]
     samples = ("16", "8", "8") if args.smoke else ("8000", "1000", "1000")
     batch_size = "4" if args.smoke else "64"
     log_every = "2" if args.smoke else "2000"
+    if prefix == "burgers_nu0.01":
+        width, modes = "104", "10"
+    else:
+        width, modes = "69", "24"
     return [
         sys.executable,
         str(ROOT / "code" / "baselines_1d_burgers.py"),
@@ -64,8 +68,8 @@ def fno_command(dataset_dir: Path, prefix: str, output: Path, args) -> list[str]
         "--test-samples", samples[2],
         "--steps", str(args.baseline_steps),
         "--batch-size", batch_size,
-        "--width", "104",
-        "--modes", "10",
+        "--width", width,
+        "--modes", modes,
         "--layers", "4",
         "--seed", str(args.seed),
         "--log-every", log_every,

@@ -182,22 +182,82 @@ def performance_comparison():
     values = np.array(
         [
             [
-                read_json(RUNS / "latent_pde_all_lowrank_joint" / "metrics.json")["final"]["test"],
-                read_json(CROSS / "new_model_eval" / "burgers_rank16" / "metrics.json")["test_relative_l2"],
-                read_json(RUNS / "fno_w104_m10_s7_24k" / "metrics.json")["test_relative_l2"],
-                read_json(RUNS / "deeponet_pm501_s7_24k" / "metrics.json")["test_relative_l2"],
+                np.mean(
+                    [
+                        read_json(RUNS / "latent_pde_all_lowrank_joint" / "metrics.json")["final"]["test"],
+                        read_json(RUNS / "latent_pde_all_lowrank_joint_s11" / "metrics.json")["final"]["test"],
+                        read_json(RUNS / "latent_pde_all_lowrank_joint_s23" / "metrics.json")["final"]["test"],
+                    ]
+                ),
+                np.mean(
+                    [
+                        read_json(RUNS / "latent_pde_all_lowrank_joint" / "metrics.json")["final"]["test"],
+                        read_json(RUNS / "latent_pde_all_lowrank_joint_s11" / "metrics.json")["final"]["test"],
+                        read_json(RUNS / "latent_pde_all_lowrank_joint_s23" / "metrics.json")["final"]["test"],
+                    ]
+                ),
+                np.mean(
+                    [
+                        read_json(RUNS / "fno_w104_m10_s7_24k" / "metrics.json")["test_relative_l2"],
+                        read_json(RUNS / "fno_w104_m10_s11_24k" / "metrics.json")["test_relative_l2"],
+                        read_json(RUNS / "fno_w104_m10_s23_24k" / "metrics.json")["test_relative_l2"],
+                    ]
+                ),
+                np.mean(
+                    [
+                        read_json(RUNS / "deeponet_pm501_s7_24k" / "metrics.json")["test_relative_l2"],
+                        read_json(RUNS / "deeponet_pm501_s11_24k" / "metrics.json")["test_relative_l2"],
+                        read_json(RUNS / "deeponet_pm501_s23_24k" / "metrics.json")["test_relative_l2"],
+                    ]
+                ),
             ],
             [
-                read_json(CROSS / "full" / "diff_sorp" / "ms_lr_lpo" / "metrics.json")["test_relative_l2"],
-                read_json(CROSS / "new_model_eval" / "diff_sorp" / "metrics.json")["test_relative_l2"],
-                read_json(CROSS / "full" / "diff_sorp" / "fno" / "metrics.json")["test_relative_l2"],
-                read_json(CROSS / "full" / "diff_sorp" / "deeponet" / "metrics.json")["test_relative_l2"],
+                np.mean(
+                    [
+                        read_json(CROSS / "full" / "diff_sorp" / "ms_lr_lpo" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "seeds" / "diff_sorp" / "pg_ms_lr_lpo_s11_12k" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "seeds" / "diff_sorp" / "pg_ms_lr_lpo_s23_12k" / "metrics.json")["test_relative_l2"],
+                    ]
+                ),
+                np.mean(
+                    [
+                        read_json(CROSS / "full" / "diff_sorp" / "ms_lr_lpo" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "seeds" / "diff_sorp" / "pg_ms_lr_lpo_s11_12k" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "seeds" / "diff_sorp" / "pg_ms_lr_lpo_s23_12k" / "metrics.json")["test_relative_l2"],
+                    ]
+                ),
+                np.mean(
+                    [
+                        read_json(CROSS / "fno_search" / "diff_sorp" / "fno_m24_w69" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "seeds" / "diff_sorp" / "fno_m24_w69_s11" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "seeds" / "diff_sorp" / "fno_m24_w69_s23" / "metrics.json")["test_relative_l2"],
+                    ]
+                ),
+                np.mean(
+                    [
+                        read_json(CROSS / "full" / "diff_sorp" / "deeponet" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "seeds" / "diff_sorp" / "deeponet_s11" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "seeds" / "diff_sorp" / "deeponet_s23" / "metrics.json")["test_relative_l2"],
+                    ]
+                ),
             ],
             [
                 read_json(CROSS / "full" / "advection_beta1" / "ms_lr_lpo" / "metrics.json")["test_relative_l2"],
                 read_json(CROSS / "improve_advection" / "transport_prior" / "metrics.json")["test_relative_l2"],
-                read_json(CROSS / "improve_advection" / "comparison" / "fno" / "metrics.json")["test_relative_l2"],
-                read_json(CROSS / "improve_advection" / "comparison" / "deeponet" / "metrics.json")["test_relative_l2"],
+                np.mean(
+                    [
+                        read_json(CROSS / "fno_search" / "advection_beta1" / "fno_m24_w69" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "seeds" / "advection_beta1" / "fno_m24_w69_s11" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "seeds" / "advection_beta1" / "fno_m24_w69_s23" / "metrics.json")["test_relative_l2"],
+                    ]
+                ),
+                np.mean(
+                    [
+                        read_json(CROSS / "improve_advection" / "comparison" / "deeponet" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "seeds" / "advection_beta1" / "deeponet_s11" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "seeds" / "advection_beta1" / "deeponet_s23" / "metrics.json")["test_relative_l2"],
+                    ]
+                ),
             ],
         ]
     )
@@ -227,7 +287,7 @@ def performance_comparison():
     axis.set_ylabel("Relative Test L2 (log scale, lower is better)")
     axis.set_title(
         "PG-MS-LR-LPO across PDEBench tasks\n"
-        "Standard model: 501,435 params | FNO: 502,997 | DeepONet: 501,473",
+        "Standard model: 501,435 params | FNO: 498,503-502,997 | DeepONet: 501,473",
         pad=16,
         fontsize=14,
         linespacing=1.45,
