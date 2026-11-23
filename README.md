@@ -120,6 +120,27 @@ PG 对 FNO 的 Welch p 为 `0.00091`，对 DeepONet 为 `0.00399`。
 32K 后单 1K 收益已低于约 `0.1%`，36K 仍无 dev/test 过拟合迹象，但进入低收益平台。
 这说明高速平流不能只依赖解析平移，必须学习插值残差。
 
+### 参数网格与反演可辨识性
+
+当前 advection 参数网格已扩展到：
+
+```text
+beta = 0.2, 0.7, 1.0, 2.0, 4.0, 7.0
+```
+
+对多参数轨迹做无先验 β 扫描时发现：周期离散平移存在速度混叠。在时间步长
+`dt=0.02`、空间网格 `NX=256` 时，相隔 `1/(dt*NX)=0.1953` 的候选速度会产生近似
+整数格点平移。因此“无范围约束的全局参数反演”是不适定的。
+
+这不代表反演不可做，而是论文必须加入：
+
+- β 的物理先验范围；
+- 非均匀时间观测；
+- 多初值或多视图数据；
+- 或直接学习参数后验分布。
+
+当前反演实验用于诊断可辨识性，不作为最终成功率结果。
+
 ## Burgers 三 seed
 
 关闭平移分支后，PG-MS-LR-LPO 与 Burgers 原模型等价。三 seed Test L2：
@@ -323,6 +344,7 @@ python code/baselines_1d_burgers.py \
 | `code/train_coord_attention.py` | 训练、checkpoint 加载、evaluate-only 和物理分支配置 |
 | `code/baselines_1d_burgers.py` | 参数匹配 FNO 与 DeepONet |
 | `code/run_cross_pde_matrix.py` | Burgers、advection、diffusion-sorption 四模型矩阵 |
+| `code/evaluate_advection_beta_inference.py` | advection β 多参数反演与离散可辨识性诊断 |
 | `code/burgers_common.py` | 数据读取、split 解析、误差与坐标工具 |
 | `datasets/pdebench_group_to_parquet.py` | 分组和整块 tensor 两种 PDEBench 1D HDF5 转换 |
 | `analysis_plots_clean/make_current_figures.py` | 生成 README 当前图片 |
