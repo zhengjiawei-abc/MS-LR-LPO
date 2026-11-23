@@ -56,7 +56,7 @@ Burgers 和 diffusion-sorption 没有已知常速平移项，因此关闭该分�
 |---|---:|---:|---:|---:|
 | Burgers `Nu=0.01` | 0.019759 | **0.019758** | 0.024355 | 0.267974 |
 | 1D diffusion-sorption | 0.003312 | **0.003310** | 0.701195 | 0.014917 |
-| 1D advection `beta=1.0` | 0.017053 | **0.004543** | 0.006932 | 0.440765 |
+| 1D advection `beta=1.0` | 0.017053 | **0.004543** | 0.006542 | 0.440765 |
 
 物理引导模型相对两个参数匹配 baseline：
 
@@ -64,7 +64,7 @@ Burgers 和 diffusion-sorption 没有已知常速平移项，因此关闭该分�
 |---|---:|---:|
 | Burgers | 19.61% | 92.57% |
 | Diffusion-sorption | 99.52% | 81.06% |
-| Advection | 34.80% | 99.09% |
+| Advection | 31.44% | 99.09% |
 
 DeepONet 每个训练步只随机采样 `256` 个时空点进行监督；PG-MS-LR-LPO 和 FNO 使用完整
 `256 x 101` 输出场。因此 DeepONet 数字反映当前标准配置，不应被解释为完全相同的监督条件。
@@ -80,9 +80,9 @@ Advection 原模型 Test L2 为 `0.017053`。单纯从 12K checkpoint 继续训�
 Test L2 = 0.004543
 ```
 
-相比原模型降低约 `73.4%`。参数搜索后的最佳 FNO 配置为 `modes=24, width=69`
-（498,503 参数），三 seed Test L2 为 `0.006967 +- 0.000064`；PG-MS-LR-LPO
-输出不依赖随机初始化，仍比它低约 `34.8%`。
+相比原模型降低约 `73.4%`。参数匹配后的 FNO 配置为 `modes=25, width=68`
+（503,165 参数），三 seed Test L2 为 `0.006626 +- 0.000109`；PG-MS-LR-LPO
+输出不依赖随机初始化，仍比它低约 `31.4%`。
 
 平移速度只在 dev 的 `0.98..1.02` 范围内搜索，dev 最优值为 `1.0`，没有使用 test 调参。
 线性插值在 dev 上优于 Fourier shift 和三次插值，因此作为标准实现。
@@ -92,10 +92,10 @@ Test L2 = 0.004543
 | 方法 | Seed 7 | Seed 11 | Seed 23 | Mean +- Std |
 |---|---:|---:|---:|---:|
 | PG-MS-LR-LPO | 0.004543 | 0.004543 | 0.004543 | **0.004543 +- 0** |
-| 最佳参数匹配 FNO | 0.006932 | 0.007041 | 0.006928 | 0.006967 +- 0.000064 |
+| 参数匹配 FNO | 0.006542 | 0.006749 | 0.006586 | 0.006626 +- 0.000109 |
 | 参数匹配 DeepONet | 0.440765 | 0.501917 | 0.548459 | 0.497047 +- 0.054012 |
 
-PG 对 FNO 的 Welch p 为 `0.00023`，对 DeepONet 为 `0.00399`。
+PG 对 FNO 的 Welch p 为 `0.00091`，对 DeepONet 为 `0.00399`。
 
 ## Burgers 三 seed
 
@@ -125,7 +125,7 @@ PG 对 FNO 的 Welch p 为 `5.37e-9`，对 DeepONet 为 `0.0145`。
 |---|---:|---|
 | PG-MS-LR-LPO | 501,435 | rank17 低秩解码器，标准参数口径 |
 | Burgers 原 checkpoint | 498,555 | rank16，三 seed 精度实测来源 |
-| 参数匹配 FNO | 498,503-502,997 | 标准配置 width 104, modes 10；跨 PDE 最佳搜索 width 69, modes 24 |
+| 参数匹配 FNO | 502,997-503,165 | Burgers 使用 width 104, modes 10；跨 PDE 使用 width 68, modes 25 |
 | 参数匹配 DeepONet | 501,473 | basis 128, branch 512, trunk 148 |
 
 周期平移分支不使用可训练参数。Burgers 表中新模型使用 rank16 checkpoint，向 rank17 的零扩展
@@ -310,7 +310,7 @@ python code/baselines_1d_burgers.py \
 - 周期平移分支只适用于已知常速、周期边界的线性平流。
 - Diffusion-sorption 使用归一化时间坐标，不能直接复用 Burgers PDE residual。
 - 当前模型训练成本明显高于 FNO 和 DeepONet。
-- 将 FNO 改为 `width=69, modes=24` 后，diffusion-sorption 仍为 `0.701195`，说明低分不只是
+- 将 FNO 改为 `width=68, modes=25` 后，diffusion-sorption 仍为 `0.701195`，说明低分不只是
   `modes=10` 的限制，后续需要检查任务条件、输入输出归一化和训练目标。
 - 数据、checkpoint 和实验输出保存在本地 `datasets/` 与 `experiments/`，不提交到 Git。
 

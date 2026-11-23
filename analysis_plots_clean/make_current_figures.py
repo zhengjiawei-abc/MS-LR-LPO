@@ -228,9 +228,9 @@ def performance_comparison():
                 ),
                 np.mean(
                     [
-                        read_json(CROSS / "fno_search" / "diff_sorp" / "fno_m24_w69" / "metrics.json")["test_relative_l2"],
-                        read_json(CROSS / "seeds" / "diff_sorp" / "fno_m24_w69_s11" / "metrics.json")["test_relative_l2"],
-                        read_json(CROSS / "seeds" / "diff_sorp" / "fno_m24_w69_s23" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "fno_pm503" / "diff_sorp" / "s7" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "fno_pm503" / "diff_sorp" / "s11" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "fno_pm503" / "diff_sorp" / "s23" / "metrics.json")["test_relative_l2"],
                     ]
                 ),
                 np.mean(
@@ -246,9 +246,9 @@ def performance_comparison():
                 read_json(CROSS / "improve_advection" / "transport_prior" / "metrics.json")["test_relative_l2"],
                 np.mean(
                     [
-                        read_json(CROSS / "fno_search" / "advection_beta1" / "fno_m24_w69" / "metrics.json")["test_relative_l2"],
-                        read_json(CROSS / "seeds" / "advection_beta1" / "fno_m24_w69_s11" / "metrics.json")["test_relative_l2"],
-                        read_json(CROSS / "seeds" / "advection_beta1" / "fno_m24_w69_s23" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "fno_pm503" / "advection_beta1" / "s7" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "fno_pm503" / "advection_beta1" / "s11" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "fno_pm503" / "advection_beta1" / "s23" / "metrics.json")["test_relative_l2"],
                     ]
                 ),
                 np.mean(
@@ -287,7 +287,7 @@ def performance_comparison():
     axis.set_ylabel("Relative Test L2 (log scale, lower is better)")
     axis.set_title(
         "PG-MS-LR-LPO across PDEBench tasks\n"
-        "Standard model: 501,435 params | FNO: 498,503-502,997 | DeepONet: 501,473",
+        "Standard model: 501,435 params | FNO: 502,997-503,165 | DeepONet: 501,473",
         pad=16,
         fontsize=14,
         linespacing=1.45,

@@ -56,7 +56,7 @@ def fno_command(dataset_dir: Path, prefix: str, output: Path, args) -> list[str]
     if prefix == "burgers_nu0.01":
         width, modes = "104", "10"
     else:
-        width, modes = "69", "24"
+        width, modes = "68", "25"
     return [
         sys.executable,
         str(ROOT / "code" / "baselines_1d_burgers.py"),
