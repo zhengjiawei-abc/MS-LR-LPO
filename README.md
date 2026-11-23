@@ -37,7 +37,8 @@ u(x, t) = u_p(x, t)
           + alpha * (u_n(x, t) - u_p(x, t))
 ```
 
-当前 advection 基准使用 `alpha = 0`。平移分支使用周期边界和线性插值，不增加可训练参数。
+低 beta 的 advection 基准使用固定 `alpha = 0`。高速平移时可以把 `alpha` 设为可学习参数，
+让神经分支拟合平移基线的离散残差。固定分支不增加参数，可学习分支只增加 1 个参数。
 Burgers 和 diffusion-sorption 没有已知常速平移项，因此关闭该分支，模型退化为原 MS-LR-LPO。
 
 这个分支是物理先验，不是对所有 PDE 都生效的通用加速器。Burgers 的输运速度依赖局部解 `u`，
@@ -97,6 +98,21 @@ Test L2 = 0.004543
 
 PG 对 FNO 的 Welch p 为 `0.00091`，对 DeepONet 为 `0.00399`。
 
+### 高速平移与残差融合
+
+`beta=2.0` 时，线性平移的离散误差明显增大。固定平移 Test L2 为 `0.008304`，
+反而落后 FNO 的 `0.006300`。将融合系数设为可学习，并从固定平移解继续训练 4K 步后：
+
+| beta=2.0 方法 | 参数 | Test L2 |
+|---|---:|---:|
+| 基础神经模型 | 501,435 | 0.020495 |
+| 固定周期平移 | 501,435 | 0.008304 |
+| PG + 可学习残差融合 | 501,436 | **0.006040** |
+| 参数匹配 FNO | 503,165 | 0.006300 |
+| DeepONet | 501,473 | 0.6260 |
+
+学习得到的融合系数为 `0.0687`。这说明高速平流不能只依赖解析平移，必须学习插值残差。
+
 ## Burgers 三 seed
 
 关闭平移分支后，PG-MS-LR-LPO 与 Burgers 原模型等价。三 seed Test L2：
@@ -124,12 +140,13 @@ PG 对 FNO 的 Welch p 为 `5.37e-9`，对 DeepONet 为 `0.0145`。
 | 模型 | 参数量 | 说明 |
 |---|---:|---|
 | PG-MS-LR-LPO | 501,435 | rank17 低秩解码器，标准参数口径 |
+| PG + 可学习残差融合 | 501,436 | 高速平移变体，仅增加 1 个融合参数 |
 | Burgers 原 checkpoint | 498,555 | rank16，三 seed 精度实测来源 |
 | 参数匹配 FNO | 502,997-503,165 | Burgers 使用 width 104, modes 10；跨 PDE 使用 width 68, modes 25 |
 | 参数匹配 DeepONet | 501,473 | basis 128, branch 512, trunk 148 |
 
-周期平移分支不使用可训练参数。Burgers 表中新模型使用 rank16 checkpoint，向 rank17 的零扩展
-不会改变前向函数，因此与 `501,435` 输出严格一致。
+固定平移分支不使用可训练参数；可学习残差融合只增加 1 个标量。Burgers 表中新模型使用
+rank16 checkpoint，向 rank17 的零扩展不会改变前向函数，因此与 `501,435` 输出严格一致。
 
 ## 物理残差
 
@@ -308,6 +325,7 @@ python code/baselines_1d_burgers.py \
 - Burgers、diffusion-sorption、advection 的模型对比均补齐三 seed；
   advection 物理分支输出确定，因此标准差为 0。
 - 周期平移分支只适用于已知常速、周期边界的线性平流。
+- 高 beta 下定点平移受离散插值误差限制，需要使用可学习残差分支。
 - Diffusion-sorption 使用归一化时间坐标，不能直接复用 Burgers PDE residual。
 - 当前模型训练成本明显高于 FNO 和 DeepONet。
 - 将 FNO 改为 `width=68, modes=25` 后，diffusion-sorption 仍为 `0.701195`，说明低分不只是

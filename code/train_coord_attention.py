@@ -113,6 +113,7 @@ def main() -> None:
         }
         operator["grid_transport_velocity"] = args.grid_transport_velocity
         operator["grid_transport_blend"] = args.grid_transport_blend
+        operator["grid_transport_learnable"] = args.grid_transport_learnable
         cfg = OperatorConfig(**operator)
     else:
         cfg = OperatorConfig(

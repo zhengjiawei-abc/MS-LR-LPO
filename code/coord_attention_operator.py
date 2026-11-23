@@ -50,6 +50,7 @@ class OperatorConfig:
     grid_lowrank_rank: int = 0
     grid_transport_velocity: float = 0.0
     grid_transport_blend: float = 0.0
+    grid_transport_learnable: bool = False
 
 
 class CoordinateEmbedding(nn.Module):
@@ -528,6 +529,11 @@ class CoordAttentionOperator(nn.Module):
             self.register_buffer("transport_x0", x0)
             self.register_buffer("transport_x1", (x0 + 1).remainder(NX))
             self.register_buffer("transport_frac", position - x0.float())
+        self.transport_blend = (
+            nn.Parameter(torch.tensor(float(cfg.grid_transport_blend)))
+            if cfg.grid_transport_learnable
+            else None
+        )
 
     def encode(self, u0: torch.Tensor):
         return self.context(u0), (
@@ -579,7 +585,11 @@ class CoordAttentionOperator(nn.Module):
         lower = torch.gather(source, 1, index0)
         upper = torch.gather(source, 1, index1)
         transport = lower + self.transport_frac * (upper - lower)
-        blend = self.cfg.grid_transport_blend
+        blend = (
+            self.transport_blend
+            if self.transport_blend is not None
+            else self.cfg.grid_transport_blend
+        )
         return transport + blend * (field - transport)
 
     def reconstruct(self, u0: torch.Tensor) -> torch.Tensor:
