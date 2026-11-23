@@ -67,6 +67,8 @@ def main() -> None:
     p.add_argument("--min-lr-ratio", type=float, default=0.02)
     p.add_argument("--grad-clip", type=float, default=1.0)
     p.add_argument("--eval-every", type=int, default=1000)
+    p.add_argument("--save-every", type=int, default=0)
+    p.add_argument("--test-every", type=int, default=0)
     p.add_argument("--seed", type=int, default=7)
     p.add_argument("--data-dir", type=Path, default=DATA_DIR)
     p.add_argument("--dataset-prefix", default="burgers_nu0.01")
@@ -256,6 +258,29 @@ def main() -> None:
             if dev_l2 < best:
                 best, best_step, best_state = dev_l2, step + 1, copy.deepcopy(model.state_dict())
             print(f"step {step + 1:6d} loss {loss.item():.3e} dev_l2 {dev_l2:.4f} best {best:.4f}@{best_step}", flush=True)
+            if args.save_every > 0 and (step + 1) % args.save_every == 0:
+                milestone_dir = args.output_dir / "milestones" / f"step_{step + 1:06d}"
+                milestone_dir.mkdir(parents=True, exist_ok=True)
+                torch.save(
+                    {"state_dict": model.state_dict(), "operator": asdict(cfg)},
+                    milestone_dir / "model.pt",
+                )
+                milestone = {
+                    "step": step + 1,
+                    "dev_l2": dev_l2,
+                    "parameter_count": count_parameters(model),
+                }
+                if args.test_every > 0 and (step + 1) % args.test_every == 0:
+                    milestone["test_l2"] = evaluate(model, test, device)
+                    print(
+                        f"milestone {step + 1:6d} test_l2 "
+                        f"{milestone['test_l2']:.6f}",
+                        flush=True,
+                    )
+                (milestone_dir / "metrics.json").write_text(
+                    json.dumps(milestone, indent=2),
+                    encoding="utf-8",
+                )
 
     model.load_state_dict(best_state)
     res = {"train_l2": evaluate(model, train[:256], device), "dev_l2": best,
