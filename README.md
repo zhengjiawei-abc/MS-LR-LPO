@@ -8,6 +8,9 @@
 完整方法、实验协议、结果边界与复现说明见
 [技术报告](docs/TECHNICAL_REPORT.md)。
 
+PDF 版本见
+[PG-MS-LR-LPO 技术报告（PDF）](output/pdf/PG-MS-LR-LPO-Technical-Report.pdf)。
+
 ```text
 u0(x) -> context encoder
       -> LatentPDE time evolution
