@@ -72,6 +72,24 @@ DeepONet 每个训练步只随机采样 `256` 个时空点进行监督；PG-MS-L
 
 下面的百分比汇总和性能图使用三 seed 均值；主表保留 seed 7 原始值，便于逐项核对。
 
+### 结果边界与可声明范围
+
+当前可支持的结论是：
+
+- 在 Burgers `Nu=0.01`、diffusion-sorption 和已测六个 advection β 上，
+  PG-MS-LR-LPO 在绝大多数设置中优于参数匹配 FNO。
+- 在所有已测设置中，PG-MS-LR-LPO 均优于标准 DeepONet。
+- β=2、4 的可学习残差可以超过 FNO；β=7 的最新高频分支为 `0.011352`，
+  仍落后 FNO 的 `0.009003`，是当前明确失败案例。
+
+尚不能声称“全面超过官方 PDEBench”：
+
+- Burgers 只使用 `Nu=0.01`，不是全部 12 个粘度文件。
+- Advection 使用了 6 个 β，尚缺官方 `0.1` 和 `0.4`。
+- 1D CFD、2D CFD、Darcy、SWE 和 NS 尚未执行。
+- FNO/DeepONet 是项目内的参数匹配实现，不是 PDEBench 官方榜单结果。
+- DeepONet 仍使用 256 点随机监督，需要补充全监督版本。
+
 ## Advection 改进
 
 Advection 原模型 Test L2 为 `0.017053`。单纯从 12K checkpoint 继续训练 6K 后降至
