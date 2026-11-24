@@ -132,6 +132,25 @@ def main() -> None:
             for name, value in checkpoint["state_dict"].items()
             if name in current and current[name].shape == value.shape
         }
+        x_proj_key = "grid_decoder.x_proj.weight"
+        if x_proj_key in checkpoint["state_dict"] and x_proj_key in current:
+            old_weight = checkpoint["state_dict"][x_proj_key]
+            new_weight = current[x_proj_key]
+            if (
+                old_weight.ndim == new_weight.ndim == 2
+                and old_weight.shape[0] == new_weight.shape[0]
+                and old_weight.shape[1] < new_weight.shape[1]
+                and old_weight.shape[1] % 2 == 0
+                and new_weight.shape[1] % 2 == 0
+            ):
+                old_bands = old_weight.shape[1] // 2
+                new_bands = new_weight.shape[1] // 2
+                expanded = torch.zeros_like(new_weight)
+                expanded[:, :old_bands] = old_weight[:, :old_bands]
+                expanded[:, new_bands : new_bands + old_bands] = old_weight[
+                    :, old_bands:
+                ]
+                compatible[x_proj_key] = expanded
         incompatible = model.load_state_dict(compatible, strict=False)
         buffer_names = {name for name, _ in model.named_buffers()}
         missing = [
