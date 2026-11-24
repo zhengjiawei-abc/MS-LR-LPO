@@ -5,6 +5,9 @@
 当前标准模型是在原 MS-LR-LPO 上加入可选周期常速平移分支的物理引导神经算子。
 主线流程为：
 
+完整方法、实验协议、结果边界与复现说明见
+[技术报告](docs/TECHNICAL_REPORT.md)。
+
 ```text
 u0(x) -> context encoder
       -> LatentPDE time evolution
