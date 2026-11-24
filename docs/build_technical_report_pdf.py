@@ -85,11 +85,15 @@ FIGURES = {
             "图 7. 二维不可压缩 NS 的速度与散度三方对比。",
         ),
     ],
-    "## 6. 参数反演与可辨识性": [
+    "### 5.7 一维效率与高监督 DeepONet": [
         (
-            ROOT / "analysis_plots_clean" / "bounded_beta_inference.png",
-            "图 8. ±20% 参数先验下的 advection beta 反演。",
-        )
+            ROOT / "analysis_plots_clean" / "deeponet_supervision.png",
+            "图 8. Burgers DeepONet 监督点数消融。",
+        ),
+        (
+            ROOT / "analysis_plots_clean" / "efficiency_1d_summary.png",
+            "图 9. 一维 PG/FNO/DeepONet 推理效率。",
+        ),
     ],
 }
 

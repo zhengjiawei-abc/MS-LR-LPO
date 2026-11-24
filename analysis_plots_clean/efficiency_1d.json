@@ -1,0 +1,64 @@
+{
+  "device": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "batch_size": 32,
+  "grid": [
+    256,
+    101
+  ],
+  "pg_config": {
+    "d_model": 64,
+    "n_heads": 4,
+    "encoder_layers": 3,
+    "decoder_layers": 2,
+    "token_count": 32,
+    "conv_channels": 32,
+    "x_bands": 16,
+    "t_bands": 8,
+    "dropout": 0.1,
+    "dynamics": "latent_pde",
+    "latent_channels": 96,
+    "latent_length": 64,
+    "latent_recon": false,
+    "rollout_steps": 9,
+    "pde_substeps": 1,
+    "pde_modes": 32,
+    "pde_layers": 1,
+    "pde_rank": 24,
+    "output_mode": "grid",
+    "grid_hidden": 48,
+    "grid_blocks": 3,
+    "grid_length": 64,
+    "grid_block": "dense",
+    "grid_last_depthwise": false,
+    "grid_last_rank": 0,
+    "grid_lowrank_rank": 17,
+    "grid_transport_velocity": 0.0,
+    "grid_transport_blend": 0.0,
+    "grid_transport_learnable": false,
+    "grid_transport_refine": false,
+    "grid_transport_refine_hidden": 0
+  },
+  "results": {
+    "PG-MS-LR-LPO": {
+      "parameters": 501435,
+      "latency_ms": 22.03545570373535,
+      "latency_p95_ms": 23.221248626708984,
+      "throughput_samples_per_second": 1452.2050476394506,
+      "peak_gpu_memory_mb": 855.41650390625
+    },
+    "FNO": {
+      "parameters": 502997,
+      "latency_ms": 1.2047839760780334,
+      "latency_p95_ms": 1.3137919902801514,
+      "throughput_samples_per_second": 26560.778226956907,
+      "peak_gpu_memory_mb": 69.86572265625
+    },
+    "DeepONet-high": {
+      "parameters": 501473,
+      "latency_ms": 6.0687360763549805,
+      "latency_p95_ms": 6.640639781951904,
+      "throughput_samples_per_second": 5272.926618885019,
+      "peak_gpu_memory_mb": 494.22705078125
+    }
+  }
+}

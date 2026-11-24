@@ -24,6 +24,10 @@ PDF 版本见
 一维 advection 在 ±20% 参数先验、8 个时间快照和 0–10% 噪声下，β 反演
 100% 落在 5% 误差内，MAPE 为 `0.036%–0.049%`。
 
+Burgers 高监督 DeepONet 三 seed 为 `0.2532 ± 0.0050`，仍落后 PG
+`0.0198` 与 FNO `0.0246`。1D 推理延迟 PG `22.0 ms`、FNO `1.20 ms`、
+DeepONet `6.07 ms`（batch=32）。
+
 ```text
 u0(x) -> context encoder
       -> LatentPDE time evolution
@@ -76,6 +80,10 @@ u0(x) -> context encoder
 ![PDEBench 2D incompressible NS efficiency](analysis_plots_2d_ns/efficiency_summary.png)
 
 ![Bounded advection beta inversion](analysis_plots_clean/bounded_beta_inference.png)
+
+![Burgers DeepONet supervision ablation](analysis_plots_clean/deeponet_supervision.png)
+
+![PDEBench 1D efficiency](analysis_plots_clean/efficiency_1d_summary.png)
 
 ## 标准模型
 
@@ -431,6 +439,7 @@ python code/baselines_1d_burgers.py \
 | `code/coord_attention_operator.py` | LatentPDE、上下文编码、低秩解码、skip 和周期平移分支 |
 | `code/train_coord_attention.py` | 训练、checkpoint 加载、evaluate-only 和物理分支配置 |
 | `code/baselines_1d_burgers.py` | 参数匹配 FNO 与 DeepONet |
+| `code/benchmark_1d_models.py` | 1D 参数、延迟、吞吐与显存基准 |
 | `code/run_cross_pde_matrix.py` | Burgers、advection、diffusion-sorption 四模型矩阵 |
 | `code/evaluate_advection_beta_inference.py` | advection β 多参数反演与离散可辨识性诊断 |
 | `code/burgers_common.py` | 数据读取、split 解析、误差与坐标工具 |
