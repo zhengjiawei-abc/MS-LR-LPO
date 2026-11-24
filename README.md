@@ -20,6 +20,12 @@ u0(x) -> context encoder
 
 ![PG-MS-LR-LPO cross-PDE performance](analysis_plots_clean/performance_comparison.png)
 
+![Advection parameter sweep](analysis_plots_clean/parameter_sweep_comparison.png)
+
+![Residual training budget analysis](analysis_plots_clean/residual_budget_analysis.png)
+
+![High-speed residual branch ablation](analysis_plots_clean/beta7_residual_ablation.png)
+
 ![Base operator ablation study](analysis_plots_clean/ablation_study.png)
 
 ![PDEBench Burgers dataset analysis](analysis_plots_clean/dataset_analysis.png)
