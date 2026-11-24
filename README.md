@@ -14,11 +14,15 @@ PDF 版本见
 多维 PDE 扩展、官方数据转换和训练命令见
 [多维 PDE 求解扩展](docs/MULTIDIMENSIONAL_PDE.md)。
 
-首个 PDEBench 2D diffusion-reaction 三 seed 结果为 PG `0.1091 ± 0.0078`、
-参数匹配 FNO `0.2840 ± 0.0001`（`t=10` 状态到未来轨迹，64×64×41）。
+首个 PDEBench 2D diffusion-reaction 三 seed 结果为 PG-Lite `0.1053 ± 0.0006`、
+参数匹配 FNO `0.2840 ± 0.0001`、DeepONet `0.7986 ± 0.0036`
+（`t=10` 状态到未来轨迹，64×64×41）。
 
-在 PDEBench 2D incompressible NS 上，PG 速度 `0.1816 ± 0.0058`、散度
-`0.0344 ± 0.0015`；FNO 分别为 `0.3167 ± 0.0273` 和 `0.0994 ± 0.0196`。
+在 PDEBench 2D incompressible NS 上，PG-Lite 速度 `0.1742 ± 0.0035`、散度
+`0.0366 ± 0.0020`；FNO 分别为 `0.3167 ± 0.0273` 和 `0.0994 ± 0.0196`。
+
+一维 advection 在 ±20% 参数先验、8 个时间快照和 0–10% 噪声下，β 反演
+100% 落在 5% 误差内，MAPE 为 `0.036%–0.049%`。
 
 ```text
 u0(x) -> context encoder
@@ -58,6 +62,20 @@ u0(x) -> context encoder
 ![PDEBench 2D incompressible NS error over time](analysis_plots_2d_ns/time_error_curve.png)
 
 ![PDEBench 2D incompressible NS sample fields](analysis_plots_2d_ns/sample_00_channel_0.png)
+
+![PDEBench 2D diffusion-reaction module ablation](analysis_plots_2d/ablation_summary.png)
+
+![PDEBench 2D incompressible NS module ablation](analysis_plots_2d_ns/ablation_summary.png)
+
+![PDEBench 2D diffusion-reaction radial spectrum](analysis_plots_2d/radial_spectrum.png)
+
+![PDEBench 2D incompressible NS radial spectrum](analysis_plots_2d_ns/radial_spectrum.png)
+
+![PDEBench 2D diffusion-reaction efficiency](analysis_plots_2d/efficiency_summary.png)
+
+![PDEBench 2D incompressible NS efficiency](analysis_plots_2d_ns/efficiency_summary.png)
+
+![Bounded advection beta inversion](analysis_plots_clean/bounded_beta_inference.png)
 
 ## 标准模型
 
@@ -418,9 +436,11 @@ python code/baselines_1d_burgers.py \
 | `code/burgers_common.py` | 数据读取、split 解析、误差与坐标工具 |
 | `datasets/pdebench_group_to_parquet.py` | 分组和整块 tensor 两种 PDEBench 1D HDF5 转换 |
 | `code/coord_attention_operator_2d.py` | 二维潜空间谱 PDE、多尺度编码和分解式时空解码 |
-| `code/train_operator_2d.py` | PG/FNO 二维统一训练、相对时刻损失和早停 |
-| `code/baselines_2d.py` | 参数匹配二维 FNO 基线 |
+| `code/train_operator_2d.py` | PG/FNO/DeepONet 二维统一训练、相对时刻损失和早停 |
+| `code/baselines_2d.py` | 参数匹配二维 FNO 与 Fourier-trunk DeepONet 基线 |
 | `code/analyze_2d_models.py` | 二维场图、逐时刻误差和指标汇总 |
+| `code/benchmark_2d_models.py` | 二维参数、延迟、吞吐和显存基准 |
+| `code/spectral_2d_diagnostics.py` | 二维径向功率谱和高频能量诊断 |
 | `datasets/prepare_pdebench_2d.py` | PDEBench 二维分组 HDF5 转换与降采样 |
 | `datasets/prepare_ns_incom_2d.py` | 二维不可压缩 NS 时间窗、外力条件输入和轨迹切分 |
 | `code/operator_2d_common.py` | 二维误差、时窗和不可压缩散度工具 |
@@ -443,6 +463,10 @@ python code/baselines_1d_burgers.py \
 - NS 已加入速度散度约束，并显式输入 `(f_x, f_y)` 外力，但官方文件没有
   压力场，因此尚未加入完整 NS 动量方程残差；结果也只覆盖 `64 x 64` 和
   四条官方轨迹。
+- 二维最终轻量配置去掉非线性潜空间谱混合块，保留 Fourier 线性推进和
+  multi-scale skip；该配置在 reaction/NS 上都优于带谱块版本。
+- PG 精度优于 FNO，但当前推理延迟约为 FNO 的 14–15 倍，峰值显存约 231 MB
+  对 29 MB，尚不具备推理效率优势。
 - 将 FNO 改为 `width=68, modes=25` 后，diffusion-sorption 仍为 `0.701195`，说明低分不只是
   `modes=10` 的限制，后续需要检查任务条件、输入输出归一化和训练目标。
 - 数据、checkpoint 和实验输出保存在本地 `datasets/` 与 `experiments/`，不提交到 Git。

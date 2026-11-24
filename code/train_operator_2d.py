@@ -11,7 +11,7 @@ from pathlib import Path
 
 import torch
 
-from baselines_2d import FNO2D, FNO2DConfig
+from baselines_2d import DeepONet2D, DeepONet2DConfig, FNO2D, FNO2DConfig
 from coord_attention_operator_2d import (
     CoordAttentionOperator2D,
     Operator2DConfig,
@@ -31,7 +31,11 @@ from operator_2d_common import (
 
 def build_parser(model: str) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", choices=("pg2d", "fno2d"), default=model)
+    parser.add_argument(
+        "--model",
+        choices=("pg2d", "fno2d", "deeponet2d"),
+        default=model,
+    )
     parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--steps", type=int, default=4000)
@@ -64,9 +68,15 @@ def build_parser(model: str) -> argparse.ArgumentParser:
     parser.add_argument("--init-checkpoint", type=Path)
     parser.add_argument("--evaluate-only", action="store_true")
     fields = (
-        Operator2DConfig.__dataclass_fields__
-        if model == "pg2d"
-        else FNO2DConfig.__dataclass_fields__
+        (
+            Operator2DConfig.__dataclass_fields__
+            if model == "pg2d"
+            else (
+                FNO2DConfig.__dataclass_fields__
+                if model == "fno2d"
+                else DeepONet2DConfig.__dataclass_fields__
+            )
+        )
     )
     for name, field in fields.items():
         option = "--" + name.replace("_", "-")
@@ -145,13 +155,19 @@ def save_checkpoint(
 
 def main() -> None:
     pre = argparse.ArgumentParser(add_help=False)
-    pre.add_argument("--model", choices=("pg2d", "fno2d"), default="pg2d")
+    pre.add_argument(
+        "--model",
+        choices=("pg2d", "fno2d", "deeponet2d"),
+        default="pg2d",
+    )
     known, _ = pre.parse_known_args()
     args = build_parser(known.model).parse_args()
     if args.model == "pg2d":
         config_cls = Operator2DConfig
-    else:
+    elif args.model == "fno2d":
         config_cls = FNO2DConfig
+    else:
+        config_cls = DeepONet2DConfig
     if args.quick:
         args.steps = 30
         args.eval_every = 10
@@ -244,8 +260,21 @@ def main() -> None:
             spec.ny,
             spec.nt,
         ).to(device)
-    else:
+    elif args.model == "fno2d":
         model = FNO2D(cfg, spec.nx, spec.ny, spec.nt).to(device)
+    else:
+        model = DeepONet2D(
+            cfg,
+            spec.nx,
+            spec.ny,
+            spec.nt,
+            spec.x_min,
+            spec.x_max,
+            spec.y_min,
+            spec.y_max,
+            spec.t_min,
+            spec.t_max,
+        ).to(device)
     if checkpoint is not None:
         model.load_state_dict(checkpoint["state_dict"])
         print(f"initialized from {args.init_checkpoint}", flush=True)

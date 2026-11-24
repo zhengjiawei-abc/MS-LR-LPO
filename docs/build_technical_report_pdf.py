@@ -75,6 +75,22 @@ FIGURES = {
             "图 5. beta=7 高频残差分支消融。",
         )
     ],
+    "### 5.6 二维扩展结果": [
+        (
+            ROOT / "analysis_plots_2d" / "seed_comparison.png",
+            "图 6. 二维 diffusion-reaction 三 seed 三方对比。",
+        ),
+        (
+            ROOT / "analysis_plots_2d_ns" / "seed_comparison.png",
+            "图 7. 二维不可压缩 NS 的速度与散度三方对比。",
+        ),
+    ],
+    "## 6. 参数反演与可辨识性": [
+        (
+            ROOT / "analysis_plots_clean" / "bounded_beta_inference.png",
+            "图 8. ±20% 参数先验下的 advection beta 反演。",
+        )
+    ],
 }
 
 
@@ -507,6 +523,7 @@ def markdown_story(
         "### 5.3 Advection 参数扫描",
         "### 5.4 残差训练预算",
         "### 5.5 β=7 结构消融",
+        "### 5.6 二维扩展结果",
     }
 
     def flush_paragraph() -> None:

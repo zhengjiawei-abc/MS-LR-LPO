@@ -9,7 +9,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from baselines_2d import FNO2D, FNO2DConfig
+from baselines_2d import (
+    DeepONet2D,
+    DeepONet2DConfig,
+    FNO2D,
+    FNO2DConfig,
+)
 from coord_attention_operator_2d import (
     CoordAttentionOperator2D,
     Operator2DConfig,
@@ -40,6 +45,19 @@ def load_model(path: Path, spec, device: torch.device):
             spec.nx,
             spec.ny,
             spec.nt,
+        )
+    elif name == "deeponet2d":
+        model = DeepONet2D(
+            DeepONet2DConfig(**config),
+            spec.nx,
+            spec.ny,
+            spec.nt,
+            spec.x_min,
+            spec.x_max,
+            spec.y_min,
+            spec.y_max,
+            spec.t_min,
+            spec.t_max,
         )
     else:
         raise ValueError(f"unknown model: {name}")
@@ -75,27 +93,21 @@ def per_time_relative_l2(
 
 
 def plot_time_error(
-    pg_values: list[float],
-    fno_values: list[float],
+    series: list[tuple[str, list[float]]],
     time_values: np.ndarray,
     dataset_label: str,
     output: Path,
 ) -> None:
     figure, axis = plt.subplots(figsize=(8.0, 4.2))
-    axis.plot(
-        time_values,
-        pg_values,
-        marker="o",
-        linewidth=2,
-        label="PG-MS-LR-LPO-2D",
-    )
-    axis.plot(
-        time_values,
-        fno_values,
-        marker="s",
-        linewidth=2,
-        label="FNO-2D",
-    )
+    markers = ("o", "s", "^")
+    for index, (label, values) in enumerate(series):
+        axis.plot(
+            time_values,
+            values,
+            marker=markers[index % len(markers)],
+            linewidth=2,
+            label=label,
+        )
     axis.set_yscale("log")
     axis.set_xlabel("physical time")
     axis.set_ylabel("relative L2")
@@ -211,6 +223,7 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--pg-checkpoint", type=Path, required=True)
     parser.add_argument("--fno-checkpoint", type=Path, required=True)
+    parser.add_argument("--deeponet-checkpoint", type=Path)
     parser.add_argument("--samples", type=int, default=2)
     args = parser.parse_args()
 
@@ -229,6 +242,10 @@ def main() -> None:
     fno, _ = load_model(args.fno_checkpoint, spec, device)
     pg_prediction = predict(pg, inputs, device)
     fno_prediction = predict(fno, inputs, device)
+    deeponet_prediction = None
+    if args.deeponet_checkpoint is not None:
+        deeponet, _ = load_model(args.deeponet_checkpoint, spec, device)
+        deeponet_prediction = predict(deeponet, inputs, device)
     coordinates = space_time_coordinates(spec, torch.device("cpu"))
 
     metrics = {
@@ -260,14 +277,37 @@ def main() -> None:
         },
         "test_samples": inputs.size(0),
     }
+    if deeponet_prediction is not None:
+        metrics["deeponet2d"] = {
+            "relative_l2": relative_l2(deeponet_prediction, targets),
+            "divergence_relative": float(
+                divergence_relative_loss(deeponet_prediction, coordinates)
+            )
+            if incompressible
+            else None,
+            "parameters": sum(
+                value.numel() for value in deeponet.parameters()
+            ),
+            "time_relative_l2": per_time_relative_l2(
+                deeponet_prediction,
+                targets,
+            ),
+        }
     args.output_dir.mkdir(parents=True, exist_ok=True)
     (args.output_dir / "comparison.json").write_text(
         json.dumps(metrics, indent=2),
         encoding="utf-8",
     )
+    series = [
+        ("PG-MS-LR-LPO-2D", metrics["pg2d"]["time_relative_l2"]),
+        ("FNO-2D", metrics["fno2d"]["time_relative_l2"]),
+    ]
+    if "deeponet2d" in metrics:
+        series.append(
+            ("DeepONet-2D", metrics["deeponet2d"]["time_relative_l2"])
+        )
     plot_time_error(
-        metrics["pg2d"]["time_relative_l2"],
-        metrics["fno2d"]["time_relative_l2"],
+        series,
         time_values,
         dataset_label,
         args.output_dir / "time_error_curve.png",
@@ -277,6 +317,8 @@ def main() -> None:
         ("PG-MS-LR-LPO-2D", pg_prediction.numpy()),
         ("FNO-2D", fno_prediction.numpy()),
     ]
+    if deeponet_prediction is not None:
+        predictions.append(("DeepONet-2D", deeponet_prediction.numpy()))
     target = targets.numpy()
     for sample_index in range(min(args.samples, inputs.size(0))):
         for channel in range(spec.channels):

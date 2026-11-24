@@ -73,13 +73,14 @@ def main() -> None:
     parser.add_argument("--beta-min", type=float, default=0.05)
     parser.add_argument("--beta-max", type=float, default=8.0)
     parser.add_argument("--grid-size", type=int, default=500)
+    parser.add_argument("--prior-width", type=float, default=0.0)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    candidates = torch.linspace(
+    global_candidates = torch.linspace(
         args.beta_min,
         args.beta_max,
         args.grid_size,
@@ -96,6 +97,7 @@ def main() -> None:
         "observation": observation_name,
         "beta_range": [args.beta_min, args.beta_max],
         "grid_size": args.grid_size,
+        "prior_width": args.prior_width,
         "samples_per_beta": args.samples,
         "noise_results": [],
     }
@@ -103,6 +105,25 @@ def main() -> None:
         per_parameter = {}
         errors = []
         for beta, (prefix, directory) in DATASETS.items():
+            if args.prior_width > 0.0:
+                lower = max(
+                    args.beta_min,
+                    beta * (1.0 - args.prior_width),
+                )
+                upper = min(
+                    args.beta_max,
+                    beta * (1.0 + args.prior_width),
+                )
+                candidates = torch.linspace(
+                    lower,
+                    upper,
+                    args.grid_size,
+                    device=device,
+                )
+            else:
+                lower = args.beta_min
+                upper = args.beta_max
+                candidates = global_candidates
             path = ROOT / "datasets" / directory / f"{prefix}_test.parquet"
             fields = load_split(path, args.samples).to(device)
             estimate = estimate_beta(fields, candidates, time_indices, noise)
@@ -111,6 +132,7 @@ def main() -> None:
             per_parameter[str(beta)] = {
                 "mae": float(error.mean()),
                 "within_5pct": float((error / beta <= 0.05).float().mean()),
+                "candidate_range": [float(lower), float(upper)],
             }
         error = torch.cat(errors)
         true_values = torch.cat(

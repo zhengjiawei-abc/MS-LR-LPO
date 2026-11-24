@@ -1,0 +1,39 @@
+{
+  "full_spectral_block": {
+    "seeds": 3,
+    "parameters": 318683,
+    "test_mean": 0.10911409556865692,
+    "test_std": 0.007765580877224873,
+    "training_seconds_mean": 490.0731637477875
+  },
+  "final_no_spectral_block": {
+    "seeds": 3,
+    "parameters": 245155,
+    "test_mean": 0.10527608295281728,
+    "test_std": 0.0005688802127900095,
+    "training_seconds_mean": 239.94326400756836
+  },
+  "no_skips_seed7": {
+    "parameters": 306282,
+    "test_relative_l2": 0.30645638704299927,
+    "dev_relative_l2": 0.3093299865722656,
+    "test_divergence_relative": null,
+    "training_seconds": 416.14014625549316,
+    "best_step": 2500,
+    "stopped_early": false
+  },
+  "deeponet2d": {
+    "seeds": 3,
+    "parameters": 293698,
+    "test_mean": 0.7985598643620809,
+    "test_std": 0.0035504632768287837,
+    "training_seconds_mean": 26.607098817825317
+  },
+  "fno2d": {
+    "seeds": 3,
+    "parameters": 302602,
+    "test_mean": 0.2839943766593933,
+    "test_std": 6.231215210778418e-05,
+    "training_seconds_mean": 46.471648375193276
+  }
+}

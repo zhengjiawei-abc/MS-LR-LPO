@@ -19,6 +19,17 @@ class FNO2DConfig:
     layers: int = 4
 
 
+@dataclass
+class DeepONet2DConfig:
+    field_channels: int = 2
+    input_channels: int = 0
+    basis: int = 64
+    branch_hidden: int = 64
+    trunk_hidden: int = 128
+    input_grid: int = 32
+    trunk_bands: int = 8
+
+
 class SpectralConv2D(nn.Module):
     def __init__(
         self,
@@ -124,3 +135,87 @@ class FNO2D(nn.Module):
             self.ny,
         )
         return output.permute(0, 1, 3, 4, 2)
+
+
+class DeepONet2D(nn.Module):
+    """Grid branch plus space-time trunk for 2D operator learning."""
+
+    def __init__(
+        self,
+        cfg: DeepONet2DConfig,
+        nx: int,
+        ny: int,
+        nt: int,
+        x_min: float,
+        x_max: float,
+        y_min: float,
+        y_max: float,
+        t_min: float,
+        t_max: float,
+    ) -> None:
+        super().__init__()
+        input_channels = cfg.input_channels or cfg.field_channels
+        flattened = input_channels * cfg.input_grid * cfg.input_grid
+        self.field_channels = cfg.field_channels
+        self.nx = nx
+        self.ny = ny
+        self.nt = nt
+        self.input_grid = cfg.input_grid
+        self.branch = nn.Sequential(
+            nn.Linear(flattened, cfg.branch_hidden),
+            nn.GELU(),
+            nn.Linear(
+                cfg.branch_hidden,
+                cfg.field_channels * cfg.basis,
+            ),
+        )
+        x = torch.linspace(x_min, x_max, nx)
+        y = torch.linspace(y_min, y_max, ny)
+        t = torch.linspace(t_min, t_max, nt)
+        grid_x, grid_y, grid_t = torch.meshgrid(x, y, t, indexing="ij")
+        coordinates = torch.stack(
+            [
+                (grid_x.flatten() - x_min) / max(x_max - x_min, 1.0e-8) * 2.0
+                - 1.0,
+                (grid_y.flatten() - y_min) / max(y_max - y_min, 1.0e-8) * 2.0
+                - 1.0,
+                (grid_t.flatten() - t_min) / max(t_max - t_min, 1.0e-8),
+            ],
+            dim=-1,
+        )
+        feature_parts = [coordinates]
+        frequencies = math.pi * torch.arange(
+            1,
+            cfg.trunk_bands + 1,
+            dtype=torch.float32,
+        )
+        phase = coordinates[:, :, None] * frequencies[None, None, :]
+        feature_parts.extend([phase.sin().flatten(1), phase.cos().flatten(1)])
+        trunk_features = torch.cat(feature_parts, dim=-1)
+        self.register_buffer("coordinates", trunk_features)
+        self.trunk = nn.Sequential(
+            nn.Linear(trunk_features.size(1), cfg.trunk_hidden),
+            nn.GELU(),
+            nn.Linear(cfg.trunk_hidden, cfg.basis),
+        )
+        self.bias = nn.Parameter(torch.zeros(1, cfg.field_channels, 1))
+
+    def forward_grid(self, u0: torch.Tensor) -> torch.Tensor:
+        coarse = F.adaptive_avg_pool2d(
+            u0,
+            (self.input_grid, self.input_grid),
+        )
+        branch = self.branch(coarse.flatten(1)).view(
+            u0.size(0),
+            self.field_channels,
+            -1,
+        )
+        trunk = self.trunk(self.coordinates)
+        output = torch.einsum("bcp,qp->bcq", branch, trunk) + self.bias
+        return output.view(
+            u0.size(0),
+            self.field_channels,
+            self.nx,
+            self.ny,
+            self.nt,
+        )

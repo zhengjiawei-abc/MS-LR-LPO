@@ -1,0 +1,46 @@
+{
+  "full_spectral_block": {
+    "seeds": 3,
+    "parameters": 322683,
+    "test_mean": 0.1816167583068212,
+    "test_std": 0.0057844976289412485,
+    "divergence_mean": 0.03437984983126322,
+    "training_seconds_mean": 406.38090443611145
+  },
+  "final_no_spectral_block": {
+    "seeds": 3,
+    "parameters": 249155,
+    "test_mean": 0.17418630421161652,
+    "test_std": 0.0035480588687236917,
+    "divergence_mean": 0.03658903099130839,
+    "divergence_std": 0.0020121167319674033,
+    "training_seconds_mean": 232.5027997493744
+  },
+  "no_skips_seed7": {
+    "parameters": 310282,
+    "test_relative_l2": 0.30769506096839905,
+    "dev_relative_l2": 0.21823664009571075,
+    "test_divergence_relative": 0.051509472696731486,
+    "training_seconds": 344.14638090133667,
+    "best_step": 1600,
+    "stopped_early": true
+  },
+  "deeponet2d": {
+    "seeds": 3,
+    "parameters": 285442,
+    "test_mean": 8.123750368754068,
+    "test_std": 4.757735392936908,
+    "divergence_mean": 0.9379039597180153,
+    "divergence_std": 0.0721831414223712,
+    "training_seconds_mean": 24.388828198115032
+  },
+  "fno2d": {
+    "seeds": 3,
+    "parameters": 302650,
+    "test_mean": 0.31675367554028827,
+    "test_std": 0.027300271704180954,
+    "divergence_mean": 0.09939395636320114,
+    "divergence_std": 0.019646232693102922,
+    "training_seconds_mean": 58.78805065155029
+  }
+}

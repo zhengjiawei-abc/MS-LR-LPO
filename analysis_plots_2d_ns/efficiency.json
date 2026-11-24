@@ -1,0 +1,41 @@
+{
+  "device": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "batch_size": 8,
+  "grid": [
+    64,
+    64,
+    41
+  ],
+  "results": {
+    "PG-MS-LR-LPO-2D": {
+      "parameters": 249155,
+      "checkpoint_mb": 0.9841833114624023,
+      "training_seconds": 179.47108554840088,
+      "seconds_per_batch": 0.02660863971710205,
+      "latency_ms": 26.60863971710205,
+      "latency_p95_ms": 34.45555114746094,
+      "throughput_samples_per_second": 300.654226787031,
+      "peak_gpu_memory_mb": 231.21728515625
+    },
+    "FNO-2D": {
+      "parameters": 302650,
+      "checkpoint_mb": 1.1613473892211914,
+      "training_seconds": 64.44537115097046,
+      "seconds_per_batch": 0.00189900803565979,
+      "latency_ms": 1.89900803565979,
+      "latency_p95_ms": 3.2683839797973633,
+      "throughput_samples_per_second": 4212.725722995946,
+      "peak_gpu_memory_mb": 29.033203125
+    },
+    "DeepONet-2D": {
+      "parameters": 285442,
+      "checkpoint_mb": 33.76440906524658,
+      "training_seconds": 30.98599362373352,
+      "seconds_per_batch": 0.002329088091850281,
+      "latency_ms": 2.3290880918502808,
+      "latency_p95_ms": 3.0003199577331543,
+      "throughput_samples_per_second": 3434.8207042888694,
+      "peak_gpu_memory_mb": 206.515625
+    }
+  }
+}

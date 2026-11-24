@@ -26,7 +26,7 @@ u0(x, y)
   -> u(x, y, t)
 ```
 
-潜空间线性推进使用二维 Fourier 指数积分，包含可学习的通道平流和扩散项。非线性反应项由循环卷积与低秩谱混合块组成。解码器在低分辨率网格上交替执行二维空间卷积和一维时间卷积，从而避免全分辨率三维卷积。
+潜空间线性推进使用二维 Fourier 指数积分，包含可学习的通道平流和扩散项。非线性反应项由循环卷积组成；消融显示额外低秩谱混合块在两个二维任务上均冗余，因此最终配置设为 `pde_layers=0`。解码器在低分辨率网格上交替执行二维空间卷积和一维时间卷积，从而避免全分辨率三维卷积。
 
 二维 FNO 基线直接学习：
 
@@ -77,7 +77,7 @@ PG 2D：
   --model pg2d `
   --data-dir .\datasets\pdebench_diff_react_2d_t10 `
   --output-dir .\experiments\outputs_2d\pg2d_diff_react_t10_seed7 `
-  --steps 2500 --batch-size 2 --seed 7
+  --steps 2500 --batch-size 2 --seed 7 --pde-layers 0
 ```
 
 FNO 2D：
@@ -112,14 +112,18 @@ batch size 为 `2`。
 
 | 模型 | 参数量 | Test RelL2 | 训练时间 |
 |---|---:|---:|---:|
-| PG-MS-LR-LPO-2D | 318,683 | **0.1091 ± 0.0078** | 490 s |
+| PG-MS-LR-LPO-2D Lite | 245,155 | **0.1053 ± 0.0006** | 240 s |
 | FNO-2D | 302,602 | 0.2840 ± 0.0001 | 46 s |
+| DeepONet-2D | 293,698 | 0.7986 ± 0.0036 | 27 s |
 
-PG 的平均相对误差比 FNO 低约 `61.6%`，参数量多约 `5.3%`。三次 PG
-训练都没有触发早停，验证集仍在缓慢改善。代价是当前实现训练时间约为 FNO
-的 `10.5 倍`，尚未针对二维推理效率做优化。三 seed 的 Welch t 检验
-`p ≈ 6.6e-4`；样本数只有三组，这个数值用于描述当前差异，不能替代更大规模
-的统计验证。
+二维轻量标准去掉了非线性潜空间谱混合块，但保留 Fourier 线性潜空间推进。
+相较带谱块的完整版，参数从 `318,683` 降到 `245,155`，Test RelL2 从
+`0.1091` 改善到 `0.1053`。去掉全部 skip 后 Seed 7 退化到 `0.3065`，
+说明多尺度 skip 是必要模块。
+
+PG-Lite 的平均相对误差比 FNO 低约 `62.9%`，并且比 FNO 少约 `19%`
+参数；三 seed Welch t 检验 `p ≈ 2.6e-6`。DeepONet 在该任务上明显欠拟合。
+PG 训练时间约为 FNO 的 `5.2 倍`。
 
 诊断图位于 `analysis_plots_2d/`，包括：
 
@@ -182,23 +186,59 @@ test  = trajectory  3    (48 windows)
   --model pg2d `
   --data-dir .\datasets\pdebench_ns_incom_2d `
   --output-dir .\experiments\outputs_2d\ns_pg_seed7 `
-  --steps 2500 --batch-size 2 --seed 7 --divergence-weight 0.02
+  --steps 2500 --batch-size 2 --seed 7 `
+  --divergence-weight 0.02 --pde-layers 0
 ```
 
 三个随机种子的结果为：
 
 | 模型 | 参数量 | Velocity RelL2 | Divergence RelError | 训练时间 |
 |---|---:|---:|---:|---:|
-| PG-MS-LR-LPO-2D | 322,683 | **0.1816 ± 0.0058** | **0.0344 ± 0.0015** | 406 s |
-| FNO-2D | 302,650 | 0.3167 ± 0.0273 | 0.0994 ± 0.0196 | 59 s |
+| PG-MS-LR-LPO-2D Lite | 249,155 | **0.1742 ± 0.0035** | **0.0366 ± 0.0020** | 233 s |
+| FNO-2D | 302,650 | 0.3168 ± 0.0273 | 0.0994 ± 0.0196 | 59 s |
+| DeepONet-2D | 285,442 | 8.1238 ± 4.7577 | 0.9379 ± 0.0722 | 24 s |
 
-逐窗口散度指标在降采样真值上的有限差分底噪约为 `0.0065`。PG 的 `0.0344`
-约为底噪 `5.3` 倍，FNO 的 `0.0994` 约为底噪 `15.3` 倍。PG 明显更接近
-离散真值，但仍需结合速度谱检查平滑偏差。PG 的速度误差均值比 FNO 低约
-`42.7%`，三个 seed 的 Welch t 检验
-`p ≈ 0.011`，但样本量仍只有三组。PG 三次分别在 1300–1400 步触发早停，
-FNO 三次均未触发早停。
+逐窗口散度指标在降采样真值上的有限差分底噪约为 `0.0065`。PG-Lite 的
+`0.0366` 约为底噪 `5.6` 倍，FNO 的 `0.0994` 约为 `15.3` 倍。PG-Lite
+的速度误差均值比 FNO 低约 `45.0%`，且参数少约 `17.7%`；三 seed 的
+Welch t 检验 `p ≈ 0.011`。PG 三次分别在 1400–1700 步触发早停。
+
+去掉非线性潜空间谱块后，NS 速度误差从 `0.1816` 降到 `0.1742`，参数从
+`322,683` 降到 `249,155`；散度从 `0.0344` 略升到 `0.0366`。去掉 skip
+后 Seed 7 误差升到 `0.3077`，散度升到 `0.0515`，因此最终配置保留 skip。
 
 该实验明确验证了力条件输入、二维速度多通道输出和散度约束。由于官方文件
 只提供速度与外力的 `(u, v)` 分量，没有压力场，当前还没有加入完整
 Navier-Stokes 动量方程残差，也没有覆盖 512² 全分辨率或复杂几何边界。
+
+## 效率
+
+统一基准使用 RTX 4060 Laptop GPU、batch size 8、`64 x 64 x 41` 输出，
+报告 100 次重复的中位延迟：
+
+| 任务/模型 | 延迟 | 吞吐 | 峰值显存 | checkpoint |
+|---|---:|---:|---:|---:|
+| Reaction PG-Lite | 26.1 ms | 306 samples/s | 231 MB | 0.97 MB |
+| Reaction FNO | 1.72 ms | 4,641 samples/s | 29 MB | 1.16 MB |
+| Reaction DeepONet | 2.33 ms | 3,434 samples/s | 206 MB | 33.8 MB |
+| NS PG-Lite | 26.6 ms | 301 samples/s | 231 MB | 0.98 MB |
+| NS FNO | 1.90 ms | 4,213 samples/s | 29 MB | 1.16 MB |
+| NS DeepONet | 2.33 ms | 3,435 samples/s | 207 MB | 33.8 MB |
+
+PG 的精度优势伴随明显推理代价：延迟约为 FNO 的 `14–15` 倍。DeepONet
+推理快，但 checkpoint 包含全时空 trunk 坐标，文件约 `34 MB`，且两个任务
+精度都明显落后。对应图见 `analysis_plots_2d*/efficiency_summary.png`。
+
+## 频谱诊断
+
+对输出做二维 Hann 窗 FFT，并统计半径超过 Nyquist `25%` 的高频能量占比：
+
+| 任务 | Target | PG-Lite | FNO | DeepONet |
+|---|---:|---:|---:|---:|
+| Reaction | 4.70e-4 | 5.95e-4 | 1.77e-3 | 2.15e-5 |
+| NS | 9.30e-6 | 7.82e-6 | 5.01e-5 | 8.07e-5 |
+
+Reaction 上 PG-Lite 的高频占比最接近 Target，FNO 明显放大高频，DeepONet
+过度平滑。NS 上 PG-Lite 略偏平滑，但没有出现 FNO/DeepONet 的高频放大。
+这支持“PG 的精度不是单纯来自空间均值坍缩”的判断，同时提示 NS 仍有少量
+谱偏差。

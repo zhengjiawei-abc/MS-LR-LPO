@@ -28,7 +28,7 @@ class Operator2DConfig:
     pde_substeps: int = 1
     pde_modes_x: int = 8
     pde_modes_y: int = 8
-    pde_layers: int = 1
+    pde_layers: int = 0
     pde_rank: int = 8
     grid_hidden: int = 64
     grid_length_x: int = 32
@@ -37,6 +37,7 @@ class Operator2DConfig:
     temporal_blocks: int = 2
     spatial_rank: int = 16
     temporal_kernel: int = 5
+    use_skips: bool = True
 
 
 class ContextEncoder2D(nn.Module):
@@ -432,6 +433,7 @@ class GridTrajectoryDecoder2D(nn.Module):
         self.nx = nx
         self.ny = ny
         self.nt = nt
+        self.use_skips = cfg.use_skips
         self.grid_x = cfg.grid_length_x
         self.grid_y = cfg.grid_length_y
         self.context_proj = nn.Linear(cfg.d_model, channels)
@@ -448,14 +450,22 @@ class GridTrajectoryDecoder2D(nn.Module):
             for _ in range(max(1, cfg.temporal_blocks))
         )
         self.head = nn.Conv2d(hidden, cfg.field_channels, 1)
-        self.skip_projs = nn.ModuleList(
-            nn.Conv2d(cfg.conv_channels, cfg.field_channels, 1)
-            for _ in range(3)
+        self.skip_projs = (
+            nn.ModuleList(
+                nn.Conv2d(cfg.conv_channels, cfg.field_channels, 1)
+                for _ in range(3)
+            )
+            if cfg.use_skips
+            else nn.ModuleList()
         )
-        self.skip_gate = nn.Sequential(
-            nn.Linear(cfg.d_model, hidden),
-            nn.GELU(),
-            nn.Linear(hidden, 3 * nt),
+        self.skip_gate = (
+            nn.Sequential(
+                nn.Linear(cfg.d_model, hidden),
+                nn.GELU(),
+                nn.Linear(hidden, 3 * nt),
+            )
+            if cfg.use_skips
+            else None
         )
 
         x = torch.linspace(0.0, 1.0, self.grid_x)
@@ -575,6 +585,8 @@ class GridTrajectoryDecoder2D(nn.Module):
             mode="trilinear",
             align_corners=False,
         ).permute(0, 1, 3, 4, 2)
+        if not self.use_skips:
+            return state
 
         skips = []
         scales = (
