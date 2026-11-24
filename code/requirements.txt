@@ -5,6 +5,7 @@
 pandas>=2.0.0           # 数据处理和DataFrame操作
 pyarrow>=12.0.0         # Parquet文件格式支持
 numpy>=1.24.0           # 数值计算和数组操作
+h5py>=3.8.0             # PDEBench HDF5 数据读取
 
 # ============ 可视化 ============
 matplotlib>=3.7.0       # 基础绘图库

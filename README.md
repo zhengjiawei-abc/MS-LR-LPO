@@ -11,6 +11,15 @@
 PDF 版本见
 [PG-MS-LR-LPO 技术报告（PDF）](output/pdf/PG-MS-LR-LPO-Technical-Report.pdf)。
 
+多维 PDE 扩展、官方数据转换和训练命令见
+[多维 PDE 求解扩展](docs/MULTIDIMENSIONAL_PDE.md)。
+
+首个 PDEBench 2D diffusion-reaction 三 seed 结果为 PG `0.1091 ± 0.0078`、
+参数匹配 FNO `0.2840 ± 0.0001`（`t=10` 状态到未来轨迹，64×64×41）。
+
+在 PDEBench 2D incompressible NS 上，PG 速度 `0.1816 ± 0.0058`、散度
+`0.0344 ± 0.0015`；FNO 分别为 `0.3167 ± 0.0273` 和 `0.0994 ± 0.0196`。
+
 ```text
 u0(x) -> context encoder
       -> LatentPDE time evolution
@@ -37,6 +46,18 @@ u0(x) -> context encoder
 ![PDEBench Burgers dataset analysis](analysis_plots_clean/dataset_analysis.png)
 
 ![Base operator training curves](analysis_plots_clean/training_curves.png)
+
+![PDEBench 2D diffusion-reaction three-seed comparison](analysis_plots_2d/seed_comparison.png)
+
+![PDEBench 2D diffusion-reaction error over time](analysis_plots_2d/time_error_curve.png)
+
+![PDEBench 2D diffusion-reaction sample fields](analysis_plots_2d/sample_00_channel_0.png)
+
+![PDEBench 2D incompressible NS three-seed comparison](analysis_plots_2d_ns/seed_comparison.png)
+
+![PDEBench 2D incompressible NS error over time](analysis_plots_2d_ns/time_error_curve.png)
+
+![PDEBench 2D incompressible NS sample fields](analysis_plots_2d_ns/sample_00_channel_0.png)
 
 ## 标准模型
 
@@ -396,6 +417,13 @@ python code/baselines_1d_burgers.py \
 | `code/evaluate_advection_beta_inference.py` | advection β 多参数反演与离散可辨识性诊断 |
 | `code/burgers_common.py` | 数据读取、split 解析、误差与坐标工具 |
 | `datasets/pdebench_group_to_parquet.py` | 分组和整块 tensor 两种 PDEBench 1D HDF5 转换 |
+| `code/coord_attention_operator_2d.py` | 二维潜空间谱 PDE、多尺度编码和分解式时空解码 |
+| `code/train_operator_2d.py` | PG/FNO 二维统一训练、相对时刻损失和早停 |
+| `code/baselines_2d.py` | 参数匹配二维 FNO 基线 |
+| `code/analyze_2d_models.py` | 二维场图、逐时刻误差和指标汇总 |
+| `datasets/prepare_pdebench_2d.py` | PDEBench 二维分组 HDF5 转换与降采样 |
+| `datasets/prepare_ns_incom_2d.py` | 二维不可压缩 NS 时间窗、外力条件输入和轨迹切分 |
+| `code/operator_2d_common.py` | 二维误差、时窗和不可压缩散度工具 |
 | `analysis_plots_clean/make_current_figures.py` | 生成 README 当前图片 |
 
 ## 已知限制
@@ -406,6 +434,15 @@ python code/baselines_1d_burgers.py \
 - 高 beta 下定点平移受离散插值误差限制，需要使用可学习残差分支。
 - Diffusion-sorption 使用归一化时间坐标，不能直接复用 Burgers PDE residual。
 - 当前模型训练成本明显高于 FNO 和 DeepONet。
+- 二维 diffusion-reaction 当前从 `t=10` 的可辨识状态推进；从随机噪声 `t=0`
+  直接预测全过程会出现严重信息损失，不能称为已解决该病态设定。
+- 二维实验使用 `64 x 64 x 41` 的降采样轨迹，尚未覆盖全分辨率、二维 NS、
+  湍流或复杂边界。
+- 二维正式结果尚未加入观测场 Gray-Scott 物理残差；官方样本配置缺少完整
+  反应项参数，因此当前“PDE”指潜空间谱演化，而不是完整二维 PINN 残差约束。
+- NS 已加入速度散度约束，并显式输入 `(f_x, f_y)` 外力，但官方文件没有
+  压力场，因此尚未加入完整 NS 动量方程残差；结果也只覆盖 `64 x 64` 和
+  四条官方轨迹。
 - 将 FNO 改为 `width=68, modes=25` 后，diffusion-sorption 仍为 `0.701195`，说明低分不只是
   `modes=10` 的限制，后续需要检查任务条件、输入输出归一化和训练目标。
 - 数据、checkpoint 和实验输出保存在本地 `datasets/` 与 `experiments/`，不提交到 Git。
@@ -415,4 +452,4 @@ python code/baselines_1d_burgers.py \
 zhengjiawei-abc  
 1103493759@qq.com
 
-最后更新：2026-11-23
+最后更新：2026-11-24

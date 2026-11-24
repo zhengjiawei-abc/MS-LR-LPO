@@ -1,0 +1,4 @@
+{
+  "test_divergence_floor": 0.006494925823062658,
+  "metric": "mean_relative_divergence_per_window"
+}
