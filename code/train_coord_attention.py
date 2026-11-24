@@ -126,11 +126,18 @@ def main() -> None:
         )
     model = CoordAttentionOperator(cfg).to(device)
     if checkpoint is not None:
-        incompatible = model.load_state_dict(checkpoint["state_dict"], strict=False)
+        current = model.state_dict()
+        compatible = {
+            name: value
+            for name, value in checkpoint["state_dict"].items()
+            if name in current and current[name].shape == value.shape
+        }
+        incompatible = model.load_state_dict(compatible, strict=False)
+        buffer_names = {name for name, _ in model.named_buffers()}
         missing = [
             key
             for key in incompatible.missing_keys
-            if not key.startswith("transport_")
+            if not key.startswith("transport_") and key not in buffer_names
         ]
         if missing:
             raise ValueError(f"missing checkpoint keys: {missing}")
