@@ -51,6 +51,8 @@ class OperatorConfig:
     grid_transport_velocity: float = 0.0
     grid_transport_blend: float = 0.0
     grid_transport_learnable: bool = False
+    grid_transport_refine: bool = False
+    grid_transport_refine_hidden: int = 0
 
 
 class CoordinateEmbedding(nn.Module):
@@ -534,6 +536,24 @@ class CoordAttentionOperator(nn.Module):
             if cfg.grid_transport_learnable
             else None
         )
+        if cfg.grid_transport_refine_hidden > 0:
+            self.transport_refiner = nn.Sequential(
+                nn.Conv2d(1, cfg.grid_transport_refine_hidden, 3, padding=1),
+                nn.SiLU(),
+                nn.Conv2d(cfg.grid_transport_refine_hidden, 1, 3, padding=1),
+            )
+        elif cfg.grid_transport_refine:
+            self.transport_refiner = nn.Conv2d(1, 1, 3, padding=1)
+        else:
+            self.transport_refiner = None
+        if self.transport_refiner is not None:
+            final = (
+                self.transport_refiner[-1]
+                if isinstance(self.transport_refiner, nn.Sequential)
+                else self.transport_refiner
+            )
+            nn.init.zeros_(final.weight)
+            nn.init.zeros_(final.bias)
 
     def encode(self, u0: torch.Tensor):
         return self.context(u0), (
@@ -590,7 +610,12 @@ class CoordAttentionOperator(nn.Module):
             if self.transport_blend is not None
             else self.cfg.grid_transport_blend
         )
-        return transport + blend * (field - transport)
+        residual = field - transport
+        if self.transport_refiner is not None:
+            residual = residual + self.transport_refiner(
+                residual.unsqueeze(1)
+            ).squeeze(1)
+        return transport + blend * residual
 
     def reconstruct(self, u0: torch.Tensor) -> torch.Tensor:
         if self.dynamics is None:

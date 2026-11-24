@@ -116,6 +116,8 @@ def main() -> None:
         operator["grid_transport_velocity"] = args.grid_transport_velocity
         operator["grid_transport_blend"] = args.grid_transport_blend
         operator["grid_transport_learnable"] = args.grid_transport_learnable
+        operator["grid_transport_refine"] = args.grid_transport_refine
+        operator["grid_transport_refine_hidden"] = args.grid_transport_refine_hidden
         cfg = OperatorConfig(**operator)
     else:
         cfg = OperatorConfig(
@@ -139,16 +141,16 @@ def main() -> None:
             if (
                 old_weight.ndim == new_weight.ndim == 2
                 and old_weight.shape[0] == new_weight.shape[0]
-                and old_weight.shape[1] < new_weight.shape[1]
                 and old_weight.shape[1] % 2 == 0
                 and new_weight.shape[1] % 2 == 0
             ):
                 old_bands = old_weight.shape[1] // 2
                 new_bands = new_weight.shape[1] // 2
                 expanded = torch.zeros_like(new_weight)
-                expanded[:, :old_bands] = old_weight[:, :old_bands]
-                expanded[:, new_bands : new_bands + old_bands] = old_weight[
-                    :, old_bands:
+                kept = min(old_bands, new_bands)
+                expanded[:, :kept] = old_weight[:, :kept]
+                expanded[:, new_bands : new_bands + kept] = old_weight[
+                    :, old_bands : old_bands + kept
                 ]
                 compatible[x_proj_key] = expanded
         incompatible = model.load_state_dict(compatible, strict=False)
@@ -156,7 +158,7 @@ def main() -> None:
         missing = [
             key
             for key in incompatible.missing_keys
-            if not key.startswith("transport_") and key not in buffer_names
+            if not key.startswith("transport") and key not in buffer_names
         ]
         if missing:
             raise ValueError(f"missing checkpoint keys: {missing}")
