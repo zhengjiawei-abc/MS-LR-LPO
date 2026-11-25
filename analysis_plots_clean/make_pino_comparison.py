@@ -27,6 +27,7 @@ from run_advection_beta_queue import fixed_transport_prediction
 OUT = Path(__file__).resolve().parent
 EXP = ROOT / "experiments"
 PINO = EXP / "pino_formal"
+REFINER = EXP / "pg_physics_refiner"
 BURGERS = EXP / "outputs_burgers_dataset" / "official_n8000"
 CROSS = EXP / "outputs_cross_pde"
 
@@ -34,6 +35,7 @@ INK = "#17212b"
 MUTED = "#64748b"
 GRID = "#d7dee8"
 PG = "#087f8c"
+PG_REFINER = "#0f5f68"
 PINO_COLOR = "#c2415d"
 FNO = "#d97706"
 TRUTH = "#94a3b8"
@@ -140,6 +142,57 @@ def pino_summary(task: str, weight_tag: str) -> dict:
     }
 
 
+def pg_refiner_summary() -> dict:
+    paths = [
+        REFINER / "burgers_h16_w01_4k" / "metrics.json",
+        REFINER / "burgers_h16_w01_4k_s11" / "metrics.json",
+        REFINER / "burgers_h16_w01_4k_s23" / "metrics.json",
+    ]
+    metrics = [read_json(path) for path in paths]
+    values = [float(item["test"]["l2"]) for item in metrics]
+    pde_values = [
+        float(item["test"]["pde_relative_rms"]) for item in metrics
+    ]
+    return {
+        **summarize(values),
+        "pde_relative_rms": summarize(pde_values),
+        "parameters": int(metrics[0]["parameter_count"]),
+        "trainable_parameters": int(metrics[0]["trainable_parameters"]),
+        "paths": [str(path) for path in paths],
+    }
+
+
+def pg_refiner_candidates() -> dict:
+    paths = {
+        "h16_w01_2k": EXP / "pg_physics_hpo" / "refiner_h16_w01_2k" / "metrics.json",
+        "h32_w03_2k": EXP / "pg_physics_hpo" / "refiner_h32_w03_2k" / "metrics.json",
+        "h64_w08_2k": EXP / "pg_physics_hpo" / "refiner_h64_w08_2k" / "metrics.json",
+        "h16_w01_4k": REFINER / "burgers_h16_w01_4k" / "metrics.json",
+    }
+    result = {}
+    for name, path in paths.items():
+        metrics = read_json(path)
+        result[name] = {
+            "physics_weight": float(metrics["config"]["physics_weight"]),
+            "refiner_hidden": int(metrics["config"]["refiner_hidden"]),
+            "steps": int(metrics["config"]["steps"]),
+            "test_l2": float(metrics["test"]["l2"]),
+            "test_pde_relative_rms": float(
+                metrics["test"]["pde_relative_rms"]
+            ),
+            "parameter_count": int(metrics["parameter_count"]),
+            "trainable_parameters": int(metrics["trainable_parameters"]),
+            "best_step": int(metrics["best_step"]),
+        }
+    return {
+        "selected": "h16_w01_4k",
+        "selection_rule": (
+            "lowest residual under dev L2 <= initial dev L2 * 1.05"
+        ),
+        "candidates": result,
+    }
+
+
 def weight_sweep() -> dict:
     configs = {
         "Burgers": {
@@ -225,6 +278,7 @@ def main() -> None:
     summary = {
         "Burgers": {
             "pg": burgers_pg,
+            "pg_refiner": pg_refiner_summary(),
             "pino": pino_summary("burgers", "w0001"),
             "truth_pde_relative_rms": burgers_truth["relative_rms"],
             "fno_test_mean": 0.024588,
@@ -244,12 +298,25 @@ def main() -> None:
         summary[task]["welch_p_vs_pg"] = float(
             ttest_ind(pg_values, pino_values, equal_var=False).pvalue
         )
+        if "pg_refiner" in summary[task]:
+            summary[task]["welch_p_refiner_vs_pino"] = float(
+                ttest_ind(
+                    summary[task]["pg_refiner"]["values"],
+                    pino_values,
+                    equal_var=False,
+                ).pvalue
+            )
     (OUT / "pino_comparison.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
     (OUT / "pino_weight_sweep.json").write_text(
         json.dumps(weight_sweep(), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (OUT / "pg_physics_refiner_summary.json").write_text(
+        json.dumps(pg_refiner_candidates(), ensure_ascii=False, indent=2)
+        + "\n",
         encoding="utf-8",
     )
 
@@ -269,7 +336,7 @@ def main() -> None:
     )
     tasks = list(summary)
     x = np.arange(len(tasks))
-    width = 0.24
+    width = 0.20
     fig, axes = plt.subplots(1, 2, figsize=(13, 5.8))
     for axis in axes:
         axis.spines["top"].set_visible(False)
@@ -278,24 +345,39 @@ def main() -> None:
         axis.set_axisbelow(True)
 
     pg_data = np.array([summary[task]["pg"]["mean"] for task in tasks])
+    refiner_data = np.array(
+        [
+            summary[task]["pg_refiner"]["mean"]
+            if "pg_refiner" in summary[task]
+            else np.nan
+            for task in tasks
+        ]
+    )
     pino_data = np.array([summary[task]["pino"]["mean"] for task in tasks])
     fno_data = np.array([summary[task]["fno_test_mean"] for task in tasks])
-    axes[0].bar(
-        x - width,
+    data_pg = axes[0].bar(
+        x - 1.5 * width,
         pg_data,
         width,
         color=PG,
         label="PG-MS-LR-LPO",
     )
-    axes[0].bar(
-        x,
+    data_refiner = axes[0].bar(
+        x - 0.5 * width,
+        refiner_data,
+        width,
+        color=PG_REFINER,
+        label="PG + physics refiner",
+    )
+    data_pino = axes[0].bar(
+        x + 0.5 * width,
         pino_data,
         width,
         color=PINO_COLOR,
         label="PINO",
     )
-    axes[0].bar(
-        x + width,
+    data_fno = axes[0].bar(
+        x + 1.5 * width,
         fno_data,
         width,
         color=FNO,
@@ -303,10 +385,13 @@ def main() -> None:
     )
     for index in range(len(tasks)):
         for offset, value, color in (
-            (-width, pg_data[index], PG),
-            (0.0, pino_data[index], PINO_COLOR),
-            (width, fno_data[index], FNO),
+            (-1.5 * width, pg_data[index], PG),
+            (-0.5 * width, refiner_data[index], PG_REFINER),
+            (0.5 * width, pino_data[index], PINO_COLOR),
+            (1.5 * width, fno_data[index], FNO),
         ):
+            if np.isnan(value):
+                continue
             axes[0].text(
                 index + offset,
                 value * 1.12,
@@ -322,10 +407,17 @@ def main() -> None:
     axes[0].set_xticks(x, tasks)
     axes[0].set_ylabel("Relative Test L2 (log scale, lower is better)")
     axes[0].set_title("Data accuracy")
-    axes[0].legend(frameon=False, ncol=3, loc="upper center")
 
     pg_pde = np.array(
         [summary[task]["pg"]["pde_relative_rms"] for task in tasks]
+    )
+    refiner_pde = np.array(
+        [
+            summary[task]["pg_refiner"]["pde_relative_rms"]["mean"]
+            if "pg_refiner" in summary[task]
+            else np.nan
+            for task in tasks
+        ]
     )
     pino_pde = np.array(
         [summary[task]["pino"]["pde_relative_rms"]["mean"] for task in tasks]
@@ -334,21 +426,28 @@ def main() -> None:
         [summary[task]["truth_pde_relative_rms"] for task in tasks]
     )
     axes[1].bar(
-        x - width,
+        x - 1.5 * width,
         pg_pde,
         width,
         color=PG,
         label="PG-MS-LR-LPO",
     )
     axes[1].bar(
-        x,
+        x - 0.5 * width,
+        refiner_pde,
+        width,
+        color=PG_REFINER,
+        label="PG + physics refiner",
+    )
+    axes[1].bar(
+        x + 0.5 * width,
         pino_pde,
         width,
         color=PINO_COLOR,
         label="PINO",
     )
-    axes[1].bar(
-        x + width,
+    truth_bar = axes[1].bar(
+        x + 1.5 * width,
         truth_pde,
         width,
         color=TRUTH,
@@ -356,10 +455,13 @@ def main() -> None:
     )
     for index in range(len(tasks)):
         for offset, value, color in (
-            (-width, pg_pde[index], PG),
-            (0.0, pino_pde[index], PINO_COLOR),
-            (width, truth_pde[index], TRUTH),
+            (-1.5 * width, pg_pde[index], PG),
+            (-0.5 * width, refiner_pde[index], PG_REFINER),
+            (0.5 * width, pino_pde[index], PINO_COLOR),
+            (1.5 * width, truth_pde[index], TRUTH),
         ):
+            if np.isnan(value):
+                continue
             axes[1].text(
                 index + offset,
                 value + 0.012,
@@ -374,7 +476,26 @@ def main() -> None:
     axes[1].set_ylim(0.0, 0.78)
     axes[1].set_ylabel("Normalized PDE residual RMS (lower is better)")
     axes[1].set_title("Physics consistency")
-    axes[1].legend(frameon=False, ncol=3, loc="upper center")
+    fig.legend(
+        [
+            data_pg,
+            data_refiner,
+            data_pino,
+            data_fno,
+            truth_bar,
+        ],
+        [
+            "PG-MS-LR-LPO",
+            "PG + physics refiner",
+            "PINO",
+            "FNO",
+            "Observed data",
+        ],
+        frameon=False,
+        ncol=5,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.012),
+    )
 
     fig.suptitle(
         "PG-MS-LR-LPO versus matched PINO\n"
@@ -384,7 +505,7 @@ def main() -> None:
         fontweight="bold",
         linespacing=1.35,
     )
-    fig.tight_layout(rect=(0, 0, 1, 0.91))
+    fig.tight_layout(rect=(0, 0.08, 1, 0.91))
     fig.savefig(OUT / "pino_comparison.png", dpi=260, bbox_inches="tight")
     plt.close(fig)
 

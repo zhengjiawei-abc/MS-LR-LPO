@@ -34,6 +34,10 @@ PINO 对比已完成。Burgers 上 PG 数据误差 `0.01977`，PINO `0.02426`；
 advection β=1 上 PG `0.004543`，PINO `0.006619`。但 PINO 的 PDE 残差更低，
 说明当前结果是“数据精度优先”，不是数据与物理残差同时占优。
 
+针对该短板新增了 Burgers 轻量物理残差修正器，仅训练 305 个参数，将数据误差
+进一步降到 `0.018761 ± 0.000038`，归一化残差从 `0.4843` 降到 `0.3718`。
+PINO 的残差仍更低，但 PG 优化版的数据优势扩大。
+
 三个一维任务的 4096 查询点高监督 DeepONet 三 seed 已完成。Burgers
 `0.2532 ± 0.0050`、advection β=1 `0.4964 ± 0.0136`、diffusion-sorption
 `0.0157 ± 0.0036`，仍全部落后对应 PG。1D 推理延迟 PG `22.0 ms`、FNO
@@ -160,6 +164,8 @@ Burgers 和 diffusion-sorption 没有已知常速平移项，因此关闭该分�
   该结果证明最终阶段稳定，不等同于三次从零独立训练。
 - 在两个已完成 PINO 对比的一维任务上，PG 的数据 L2 更低；PINO 的归一化 PDE
   残差更低，因此不能声称 PG 同时赢得数据精度和物理残差两项指标。
+- Burgers 轻量物理修正器使数据和残差同时改善，但只验证了 Burgers；其他 PDE
+  仍使用各自原配置。
 
 尚不能声称“全面超过官方 PDEBench”：
 
@@ -313,6 +319,7 @@ PG 对 FNO 的 Welch p 为 `5.37e-9`，对高监督 DeepONet 为 `0.0266`。
 | 参数匹配 FNO | 502,997-503,165 | Burgers 使用 width 104, modes 10；跨 PDE 使用 width 68, modes 25 |
 | 参数匹配 DeepONet | 501,473 | basis 128, branch 512, trunk 148 |
 | 参数匹配 PINO | 502,997-503,165 | 与 FNO 相同主干，增加归一化 PDE residual loss |
+| PG + 轻量物理修正器 | 498,860 | Burgers 专用；只新增 305 个可训练参数 |
 
 固定平移分支不使用可训练参数；可学习残差融合只增加 1 个标量。Burgers 表中新模型使用
 rank16 checkpoint，向 rank17 的零扩展不会改变前向函数，因此与 `501,435` 输出严格一致。
@@ -328,18 +335,23 @@ PINO 使用与 FNO 完全相同的参数匹配主干、数据划分、24K 训练
 | 任务 | PG-MS-LR-LPO | PINO 三 seed | FNO | PG 相对 PINO |
 |---|---:|---:|---:|---:|
 | Burgers | **0.019767 ± 0.000009** | 0.024261 ± 0.000393 | 0.024588 | 数据误差低 18.5% |
+| Burgers + 物理修正器 | **0.018761 ± 0.000038** | 0.024261 ± 0.000393 | 0.024588 | 数据误差低 22.7% |
 | Advection β=1 | **0.004543** | 0.006619 ± 0.000068 | 0.006626 | 数据误差低 31.4% |
 
-PG 对 PINO 的 Welch 检验分别为 `p=0.0025` 和 `p=0.00036`。但物理指标相反：
+基础 PG 对 PINO 的 Welch 检验分别为 `p=0.0025` 和 `p=0.00036`；Burgers
+修正器对 PINO 为 `p=0.00156`。但物理指标仍呈现权衡：
 
-| 任务 | 观测离散底噪 | PG residual RMS | PINO residual RMS |
-|---|---:|---:|---:|
-| Burgers | 0.2132 | 0.4843 | **0.2533** |
-| Advection β=1 | 0.1264 | 0.1264 | **0.1045** |
+候选修正器和三 seed 明细见
+[pg_physics_refiner_summary.json](analysis_plots_clean/pg_physics_refiner_summary.json)。
+
+| 任务 | 观测离散底噪 | PG residual RMS | PG + refiner | PINO residual RMS |
+|---|---:|---:|---:|---:|
+| Burgers | 0.2132 | 0.4843 | 0.3718 | **0.2533** |
+| Advection β=1 | 0.1264 | 0.1264 | - | **0.1045** |
 
 Burgers 上 PINO 更接近观测残差底噪；advection 上 PINO 的残差低于观测底噪，
 说明更平滑的解可以降低残差，但会牺牲函数误差。因此当前模型的正确结论是
-“数据精度优先”，不能写成“数据误差和 PDE 残差同时优于 PINO”。
+“数据精度优先”。轻量修正器缩小了残差差距，但仍未全面超过 PINO。
 
 ## 物理残差
 
@@ -353,10 +365,13 @@ PDE relative = ||r|| / characteristic_scale
 | 模型 | Test L2 | PDE Relative | 参数量 |
 |---|---:|---:|---:|
 | 数据-only 模型 | 0.01976 | 0.4844 | 498,555 |
-| 加 PDE residual 微调 | 0.02038 | 0.4152 | 501,435 |
+| 全模型 PDE 微调 | 0.02038 | 0.4152 | 501,435 |
+| 轻量物理修正器，三 seed | **0.01876** | **0.3718** | 498,860 |
 | 真值场参考 | - | 0.2132 | - |
 
-残差下降约 `14.3%`，但数据误差会略有增加。当前标准结果仍以数据-only 模型为准。
+轻量修正器相对数据-only 模型将残差降低约 `23.2%`，数据误差同时降低约 `5.1%`。
+全模型 PDE 微调会造成轻微数据退化，因此推荐 Burgers 使用轻量修正器；其他 PDE
+尚未训练对应修正器，继续使用各自原配置。
 
 ## 数据准备
 
@@ -513,7 +528,7 @@ python code/run_pino_seed_queue.py \
 
 | 路径 | 内容 |
 |---|---|
-| `code/coord_attention_operator.py` | LatentPDE、上下文编码、低秩解码、skip 和周期平移分支 |
+| `code/coord_attention_operator.py` | LatentPDE、上下文编码、低秩解码、skip、周期平移与轻量物理修正分支 |
 | `code/train_coord_attention.py` | 训练、checkpoint 加载、evaluate-only 和物理分支配置 |
 | `code/baselines_1d_burgers.py` | 参数匹配 FNO、PINO 与 DeepONet |
 | `code/benchmark_1d_models.py` | 1D 参数、延迟、吞吐与显存基准 |
@@ -521,6 +536,8 @@ python code/run_pino_seed_queue.py \
 | `code/run_residual_seed_queue.py` | β=2、4、7 最终残差阶段 seed 队列 |
 | `code/run_advection_beta_queue.py` | 新 advection β 的固定平移与匹配基线队列 |
 | `code/run_pino_seed_queue.py` | Burgers 与 advection 的参数匹配 PINO 三 seed |
+| `code/run_pg_physics_refiner_queue.py` | Burgers 轻量物理残差修正器三 seed |
+| `code/finetune_pde_residual.py` | 可配置 PDE 残差微调与数据预算选模 |
 | `analysis_plots_clean/compile_advection_eight.py` | 官方八个 β 的三方结果汇总 |
 | `analysis_plots_clean/make_deeponet_supervision.py` | 三个 1D 任务的高监督 DeepONet 对比 |
 | `analysis_plots_clean/make_pino_comparison.py` | PG/PINO 数据精度与 PDE 残差对比 |
@@ -551,7 +568,8 @@ python code/run_pino_seed_queue.py \
 - 高 beta 下定点平移受离散插值误差限制，需要使用可学习残差分支。
 - Diffusion-sorption 使用归一化时间坐标，不能直接复用 Burgers PDE residual。
 - 当前模型训练成本明显高于 FNO 和 DeepONet。
-- PINO 对比显示数据精度与 PDE 残差存在权衡；当前 PG 不是两个指标同时占优。
+- Burgers 轻量修正器让 PG 数据和残差同时改善；PINO 残差仍更低，当前仍不能声称
+  两个指标全面超过 PINO。
 - 二维 diffusion-reaction 当前从 `t=10` 的可辨识状态推进；从随机噪声 `t=0`
   直接预测全过程会出现严重信息损失，不能称为已解决该病态设定。
 - 二维实验使用 `64 x 64 x 41` 的降采样轨迹，尚未覆盖全分辨率、二维 NS、

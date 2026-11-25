@@ -53,6 +53,8 @@ class OperatorConfig:
     grid_transport_learnable: bool = False
     grid_transport_refine: bool = False
     grid_transport_refine_hidden: int = 0
+    grid_physics_refiner: bool = False
+    grid_physics_refiner_hidden: int = 0
 
 
 class CoordinateEmbedding(nn.Module):
@@ -500,6 +502,19 @@ class CoordAttentionOperator(nn.Module):
             if self.dynamics is not None and cfg.output_mode == "grid"
             else None
         )
+        self.grid_physics_refiner = (
+            nn.Sequential(
+                nn.Conv2d(1, cfg.grid_physics_refiner_hidden, 3, padding=1),
+                nn.SiLU(),
+                nn.Conv2d(cfg.grid_physics_refiner_hidden, 1, 3, padding=1),
+            )
+            if cfg.grid_physics_refiner
+            and cfg.grid_physics_refiner_hidden > 0
+            else None
+        )
+        if self.grid_physics_refiner is not None:
+            nn.init.zeros_(self.grid_physics_refiner[-1].weight)
+            nn.init.zeros_(self.grid_physics_refiner[-1].bias)
         self.blocks = (
             None
             if grid_mode
@@ -596,6 +611,10 @@ class CoordAttentionOperator(nn.Module):
             raise ValueError("grid decoder is not enabled")
         context, trajectory, skip_features = self.encode_with_skips(u0)
         field = self.grid_decoder(trajectory, context, skip_features)
+        if self.grid_physics_refiner is not None:
+            field = field + self.grid_physics_refiner(
+                field.unsqueeze(1)
+            ).squeeze(1)
         velocity = self.cfg.grid_transport_velocity
         if velocity == 0.0:
             return field

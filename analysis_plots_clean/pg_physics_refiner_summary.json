@@ -1,0 +1,46 @@
+{
+  "selected": "h16_w01_4k",
+  "selection_rule": "lowest residual under dev L2 <= initial dev L2 * 1.05",
+  "candidates": {
+    "h16_w01_2k": {
+      "physics_weight": 0.01,
+      "refiner_hidden": 16,
+      "steps": 2000,
+      "test_l2": 0.01915094442665577,
+      "test_pde_relative_rms": 0.383858859539032,
+      "parameter_count": 498860,
+      "trainable_parameters": 305,
+      "best_step": 2000
+    },
+    "h32_w03_2k": {
+      "physics_weight": 0.03,
+      "refiner_hidden": 32,
+      "steps": 2000,
+      "test_l2": 0.01989593170583248,
+      "test_pde_relative_rms": 0.3783140480518341,
+      "parameter_count": 499164,
+      "trainable_parameters": 609,
+      "best_step": 2000
+    },
+    "h64_w08_2k": {
+      "physics_weight": 0.08,
+      "refiner_hidden": 64,
+      "steps": 2000,
+      "test_l2": 0.019757574424147606,
+      "test_pde_relative_rms": 0.4843881130218506,
+      "parameter_count": 499772,
+      "trainable_parameters": 1217,
+      "best_step": 0
+    },
+    "h16_w01_4k": {
+      "physics_weight": 0.01,
+      "refiner_hidden": 16,
+      "steps": 4000,
+      "test_l2": 0.018718821927905083,
+      "test_pde_relative_rms": 0.3708891272544861,
+      "parameter_count": 498860,
+      "trainable_parameters": 305,
+      "best_step": 4000
+    }
+  }
+}
