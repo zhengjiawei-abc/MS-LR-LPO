@@ -32,8 +32,8 @@ CONFIGS = {
 
 
 def fixed_transport_prediction(u0: torch.Tensor, beta: float) -> torch.Tensor:
-    x = torch.arange(NX, dtype=torch.float32)
-    t = torch.linspace(0.0, T_FINAL, NT)
+    x = torch.arange(NX, dtype=torch.float32, device=u0.device)
+    t = torch.linspace(0.0, T_FINAL, NT, device=u0.device)
     position = (x[:, None] - beta * t[None, :] * NX).remainder(NX)
     x0 = torch.floor(position).long()
     x1 = (x0 + 1).remainder(NX)

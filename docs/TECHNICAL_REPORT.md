@@ -16,7 +16,7 @@ PG-MS-LR-LPO 是一个面向参数化一维偏微分方程的物理引导神经�
 beta = 0.1, 0.2, 0.4, 0.7, 1.0, 2.0, 4.0, 7.0
 ```
 
-实验结果表明，在参数预算接近时，PG-MS-LR-LPO 在绝大多数已测设置中优于 FNO，并在所有已测设置中优于参数匹配 DeepONet，包括已完成的高监督版本。β=2、4、7 的最终残差阶段还完成了共享早期 checkpoint、仅改变最终微调 seed 的稳定性检查。β=7 仍是明确失败案例：三 seed 最终阶段均值为 `0.011357 ± 0.000008`，仍落后 FNO 的 `0.009003`。
+实验结果表明，在参数预算接近时，PG-MS-LR-LPO 在绝大多数已测设置中优于 FNO，并在所有已测设置中优于参数匹配 DeepONet，包括已完成的高监督版本。PINO 对比显示 PG 的数据误差更低，但 PINO 的归一化 PDE 残差更低，因此当前模型是数据精度优先。β=2、4、7 的最终残差阶段还完成了共享早期 checkpoint、仅改变最终微调 seed 的稳定性检查。β=7 仍是明确失败案例：三 seed 最终阶段均值为 `0.011357 ± 0.000008`，仍落后 FNO 的 `0.009003`。
 
 2026-11-25 更新新增 PDEBench 二维 diffusion-reaction 与二维不可压缩 NS 实验，完成官方八个 advection β，以及三个一维任务的 4096 查询点高监督 DeepONet 三 seed 消融。
 
@@ -207,6 +207,17 @@ query_points=256
 
 DeepONet 支持 256 与 4096 两种查询点监督。Burgers、advection β=1 和 diffusion-sorption 的主结果使用 4096 查询点；其他 advection β 仍使用 256 查询点。高监督消融用于排除“DeepONet 落后只是因为每步采点太少”的解释。
 
+PINO：
+
+```text
+backbone = matched FNO
+data_loss = full-field MSE
+physics_loss = normalized PDE residual MSE
+training_steps = 24000
+```
+
+PINO 的物理权重先在 8K 步、seed 7 上进行选择。Burgers 使用 `1e-4`，advection β=1 使用 `5e-4`；最终结果使用三 seed 和 24K 步。物理残差采用时间边界复制、空间周期边界的中心差分，避免错误地对非周期时间窗做周期卷绕。
+
 ### 4.3 随机种子
 
 - Burgers：seed 7、11、23。
@@ -350,6 +361,28 @@ Burgers、advection β=1 和 diffusion-sorption 上将 DeepONet 训练查询点�
 
 PG 使用真实 checkpoint；FNO 和 DeepONet 的权重未在旧基线流程中保存，因此计时使用相同训练配置实例化的计算图。该基准适合比较前向复杂度，不等价于对已保存权重的逐文件复核。
 
+### 5.9 PINO 对比
+
+PINO 使用参数匹配 FNO 主干，并在全场数据损失上加入归一化 PDE residual loss。两个任务均使用 24K 步、batch size 64、相同划分和 seed 7/11/23。最终权重由 8K 步 seed-7 扫描选择，而不是使用测试集调参。
+
+| 任务 | PG-MS-LR-LPO | PINO 三 seed | FNO | PG 相对 PINO |
+|---|---:|---:|---:|---:|
+| Burgers | **0.019767 ± 0.000009** | 0.024261 ± 0.000393 | 0.024588 | 数据误差低 18.5% |
+| Advection β=1 | **0.004543** | 0.006619 ± 0.000068 | 0.006626 | 数据误差低 31.4% |
+
+PG 对 PINO 的 Welch 检验分别为 `p=0.0025` 和 `p=0.00036`。PINO 达到与 FNO 接近的数据精度，但仍落后 PG。
+
+物理残差指标呈现相反结论：
+
+| 任务 | 观测离散底噪 | PG residual RMS | PINO residual RMS |
+|---|---:|---:|---:|
+| Burgers | 0.2132 | 0.4843 | **0.2533** |
+| Advection β=1 | 0.1264 | 0.1264 | **0.1045** |
+
+Burgers 上 PINO 更接近观测残差底噪，说明加入物理损失确实改善了残差一致性。Advection 上 PINO 的残差低于观测底噪，说明更平滑的解可以压低残差，但数据误差仍高于 PG。解析平移 PG 的残差与观测底噪完全一致，因此不能仅凭“残差更低”判断 PINO 更准确。
+
+当前可支持的结论是：PG 在数据精度上优于 PINO，PINO 在 PDE 残差上更平滑；PG 并非两个指标同时占优。
+
 ## 6. 参数反演与可辨识性
 
 无先验地从轨迹估计 β 时，周期离散平移存在速度混叠。当前时间步长和空间网格下：
@@ -417,6 +450,7 @@ Delta_beta approximately 1 / (dt * NX)
 4. 训练时间、推理延迟、显存和吞吐量表：一维与二维。
 5. 模块消融：二维任务和 β=7 残差结构均已完成。
 6. 一维 advection 带 ±20% 先验范围的逆问题；二维 NS 文件参数边界审计。
+7. Burgers 与 advection β=1 的参数匹配 PINO 对比和物理权重扫描。
 
 条件性扩展：
 
@@ -432,7 +466,9 @@ Delta_beta approximately 1 / (dt * NX)
 
 不可声明：
 
-> 已全面超过官方 PDEBench 的 FNO/DeepONet，或已经解决完整二维压力场 NS、湍流、逆问题和参数反演。
+> 已全面超过官方 PDEBench 的 FNO/DeepONet/PINO，或已经在所有任务上同时取得更低数据误差和更低 PDE 残差，或已经解决完整二维压力场 NS、湍流、逆问题和参数反演。
+
+PINO 对比的正确表述是：PG 在两个已完成任务上数据误差更低，PINO 的 PDE 残差更低。
 
 同时不能把“共享早期 checkpoint、仅最终阶段改变 seed”写成“从零独立训练三 seed”。当前正确表述是最终残差微调阶段三 seed。
 
@@ -444,11 +480,13 @@ Delta_beta approximately 1 / (dt * NX)
 |---|---|
 | `code/coord_attention_operator.py` | PG-MS-LR-LPO 与残差融合 |
 | `code/train_coord_attention.py` | 训练、里程碑保存、checkpoint 恢复 |
-| `code/baselines_1d_burgers.py` | FNO/DeepONet |
+| `code/baselines_1d_burgers.py` | FNO/PINO/DeepONet |
 | `code/run_cross_pde_matrix.py` | 跨 PDE 训练矩阵 |
 | `code/run_residual_seed_queue.py` | β=2、4、7 最终残差阶段 seed 队列 |
 | `code/run_advection_beta_queue.py` | β=0.1、0.4 固定平移与匹配基线队列 |
+| `code/run_pino_seed_queue.py` | Burgers 与 advection 的参数匹配 PINO 三 seed |
 | `analysis_plots_clean/compile_advection_eight.py` | 官方八个 β 三方结果汇总 |
+| `analysis_plots_clean/make_pino_comparison.py` | PG/PINO 数据精度与残差对比 |
 | `code/evaluate_advection_beta_inference.py` | β 可辨识性诊断 |
 | `datasets/download_parallel.py` | 官方大文件分片续传与 MD5 校验 |
 | `datasets/pdebench_advection_sources.json` | 官方八个 advection 文件来源 |
@@ -464,7 +502,7 @@ experiments/preserved_checkpoints_20261123/
 
 ## 11. 结论
 
-当前 PG-MS-LR-LPO 已经形成一套可复现的一维参数化 PDE 神经算子框架。其优势集中在已知物理先验与神经残差结合的部分，而不是对所有 PDE 的统一求解能力。官方 advection 八个 β 已全部补齐；残差分支最终阶段的三 seed 结果确认 β=2、4 的优势稳定存在，而 β=7 仍落后 FNO。
+当前 PG-MS-LR-LPO 已经形成一套可复现的一维参数化 PDE 神经算子框架。其优势集中在已知物理先验与神经残差结合的部分，而不是对所有 PDE 的统一求解能力。官方 advection 八个 β 已全部补齐；残差分支最终阶段的三 seed 结果确认 β=2、4 的优势稳定存在，而 β=7 仍落后 FNO。与 PINO 的对比进一步表明，当前模型以函数数据精度优先，PINO 则提供更低的归一化 PDE 残差。
 
 最稳妥的论文定位是：
 

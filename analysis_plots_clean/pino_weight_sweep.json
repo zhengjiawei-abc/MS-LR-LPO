@@ -1,0 +1,43 @@
+{
+  "scope": "8K-step seed-7 weight selection; final runs use 24K",
+  "runs": {
+    "Burgers": {
+      "w0001": {
+        "physics_weight": 0.0001,
+        "dev_relative_l2": 0.04328815033659339,
+        "test_relative_l2": 0.044172753812745214,
+        "test_pde_relative_rms": 0.3153882324695587
+      },
+      "w0005": {
+        "physics_weight": 0.0005,
+        "dev_relative_l2": 0.04457562742754817,
+        "test_relative_l2": 0.04550957540050149,
+        "test_pde_relative_rms": 0.30373916029930115
+      },
+      "w002": {
+        "physics_weight": 0.002,
+        "dev_relative_l2": 0.05519670248031616,
+        "test_relative_l2": 0.05760819441638887,
+        "test_pde_relative_rms": 0.3058316111564636
+      }
+    },
+    "Advection beta=1": {
+      "w0001": {
+        "physics_weight": 0.0001,
+        "dev_relative_l2": 0.007841930142603815,
+        "test_relative_l2": 0.008791263186139986,
+        "test_pde_relative_rms": 0.10589805990457535
+      },
+      "w0005": {
+        "physics_weight": 0.0005,
+        "dev_relative_l2": 0.007814968354068696,
+        "test_relative_l2": 0.008767026534769684,
+        "test_pde_relative_rms": 0.10445420444011688
+      }
+    }
+  },
+  "selected": {
+    "Burgers": "w0001",
+    "Advection beta=1": "w0005"
+  }
+}

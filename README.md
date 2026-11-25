@@ -30,6 +30,10 @@ PDEBench 官方 advection 的八个 β 已全部补齐。低 β 的解析平移�
 β=2、4、7 的最终残差阶段已完成三 seed 稳定性检查。β=2、4 仍优于参数匹配 FNO；
 β=7 三 seed 均值为 `0.011357 ± 0.000008`，仍落后 FNO 的 `0.009003`。
 
+PINO 对比已完成。Burgers 上 PG 数据误差 `0.01977`，PINO `0.02426`；
+advection β=1 上 PG `0.004543`，PINO `0.006619`。但 PINO 的 PDE 残差更低，
+说明当前结果是“数据精度优先”，不是数据与物理残差同时占优。
+
 三个一维任务的 4096 查询点高监督 DeepONet 三 seed 已完成。Burgers
 `0.2532 ± 0.0050`、advection β=1 `0.4964 ± 0.0136`、diffusion-sorption
 `0.0157 ± 0.0036`，仍全部落后对应 PG。1D 推理延迟 PG `22.0 ms`、FNO
@@ -92,6 +96,8 @@ u0(x) -> context encoder
 
 ![DeepONet supervision ablation across 1D tasks](analysis_plots_clean/deeponet_supervision.png)
 
+![PG-MS-LR-LPO versus matched PINO](analysis_plots_clean/pino_comparison.png)
+
 ![PDEBench 1D efficiency](analysis_plots_clean/efficiency_1d_summary.png)
 
 ## 标准模型
@@ -152,6 +158,8 @@ Burgers 和 diffusion-sorption 没有已知常速平移项，因此关闭该分�
   `0.011357 ± 0.000008`，仍落后 FNO 的 `0.009003`，是当前明确失败案例。
 - β=2、4、7 的三 seed 只改变最终残差微调阶段，三个 seed 共享早期 checkpoint；
   该结果证明最终阶段稳定，不等同于三次从零独立训练。
+- 在两个已完成 PINO 对比的一维任务上，PG 的数据 L2 更低；PINO 的归一化 PDE
+  残差更低，因此不能声称 PG 同时赢得数据精度和物理残差两项指标。
 
 尚不能声称“全面超过官方 PDEBench”：
 
@@ -304,9 +312,34 @@ PG 对 FNO 的 Welch p 为 `5.37e-9`，对高监督 DeepONet 为 `0.0266`。
 | Burgers 原 checkpoint | 498,555 | rank16，三 seed 精度实测来源 |
 | 参数匹配 FNO | 502,997-503,165 | Burgers 使用 width 104, modes 10；跨 PDE 使用 width 68, modes 25 |
 | 参数匹配 DeepONet | 501,473 | basis 128, branch 512, trunk 148 |
+| 参数匹配 PINO | 502,997-503,165 | 与 FNO 相同主干，增加归一化 PDE residual loss |
 
 固定平移分支不使用可训练参数；可学习残差融合只增加 1 个标量。Burgers 表中新模型使用
 rank16 checkpoint，向 rank17 的零扩展不会改变前向函数，因此与 `501,435` 输出严格一致。
+
+## PINO 对比
+
+PINO 使用与 FNO 完全相同的参数匹配主干、数据划分、24K 训练步和 batch size，
+额外加入归一化 PDE residual loss。权重先在 8K 步、seed 7 上选择：
+
+- Burgers 选择 `lambda_phys=1e-4`，因为 dev 数据误差最低。
+- Advection β=1 选择 `lambda_phys=5e-4`，因为 dev 数据误差相同且残差更低。
+
+| 任务 | PG-MS-LR-LPO | PINO 三 seed | FNO | PG 相对 PINO |
+|---|---:|---:|---:|---:|
+| Burgers | **0.019767 ± 0.000009** | 0.024261 ± 0.000393 | 0.024588 | 数据误差低 18.5% |
+| Advection β=1 | **0.004543** | 0.006619 ± 0.000068 | 0.006626 | 数据误差低 31.4% |
+
+PG 对 PINO 的 Welch 检验分别为 `p=0.0025` 和 `p=0.00036`。但物理指标相反：
+
+| 任务 | 观测离散底噪 | PG residual RMS | PINO residual RMS |
+|---|---:|---:|---:|
+| Burgers | 0.2132 | 0.4843 | **0.2533** |
+| Advection β=1 | 0.1264 | 0.1264 | **0.1045** |
+
+Burgers 上 PINO 更接近观测残差底噪；advection 上 PINO 的残差低于观测底噪，
+说明更平滑的解可以降低残差，但会牺牲函数误差。因此当前模型的正确结论是
+“数据精度优先”，不能写成“数据误差和 PDE 残差同时优于 PINO”。
 
 ## 物理残差
 
@@ -319,11 +352,11 @@ PDE relative = ||r|| / characteristic_scale
 
 | 模型 | Test L2 | PDE Relative | 参数量 |
 |---|---:|---:|---:|
-| 数据-only 模型 | 0.01976 | 0.4523 | 501,435 |
-| 加 PDE residual 微调 | 0.02038 | 0.3864 | 501,435 |
-| 真值场参考 | - | 0.1469 | - |
+| 数据-only 模型 | 0.01976 | 0.4844 | 498,555 |
+| 加 PDE residual 微调 | 0.02038 | 0.4152 | 501,435 |
+| 真值场参考 | - | 0.2132 | - |
 
-残差下降约 `14.6%`，但数据误差会略有增加。当前标准结果仍以数据-only 模型为准。
+残差下降约 `14.3%`，但数据误差会略有增加。当前标准结果仍以数据-only 模型为准。
 
 ## 数据准备
 
@@ -468,19 +501,29 @@ python code/baselines_1d_burgers.py \
   --output-dir experiments/my_deeponet
 ```
 
+参数匹配 PINO 三 seed：
+
+```bash
+python code/run_pino_seed_queue.py \
+  --tasks burgers advection_beta1 \
+  --seeds 7 11 23
+```
+
 ## 代码目录
 
 | 路径 | 内容 |
 |---|---|
 | `code/coord_attention_operator.py` | LatentPDE、上下文编码、低秩解码、skip 和周期平移分支 |
 | `code/train_coord_attention.py` | 训练、checkpoint 加载、evaluate-only 和物理分支配置 |
-| `code/baselines_1d_burgers.py` | 参数匹配 FNO 与 DeepONet |
+| `code/baselines_1d_burgers.py` | 参数匹配 FNO、PINO 与 DeepONet |
 | `code/benchmark_1d_models.py` | 1D 参数、延迟、吞吐与显存基准 |
 | `code/run_cross_pde_matrix.py` | Burgers、advection、diffusion-sorption 四模型矩阵 |
 | `code/run_residual_seed_queue.py` | β=2、4、7 最终残差阶段 seed 队列 |
 | `code/run_advection_beta_queue.py` | 新 advection β 的固定平移与匹配基线队列 |
+| `code/run_pino_seed_queue.py` | Burgers 与 advection 的参数匹配 PINO 三 seed |
 | `analysis_plots_clean/compile_advection_eight.py` | 官方八个 β 的三方结果汇总 |
 | `analysis_plots_clean/make_deeponet_supervision.py` | 三个 1D 任务的高监督 DeepONet 对比 |
+| `analysis_plots_clean/make_pino_comparison.py` | PG/PINO 数据精度与 PDE 残差对比 |
 | `code/evaluate_advection_beta_inference.py` | advection β 多参数反演与离散可辨识性诊断 |
 | `code/burgers_common.py` | 数据读取、split 解析、误差与坐标工具 |
 | `datasets/pdebench_group_to_parquet.py` | 分组和整块 tensor 两种 PDEBench 1D HDF5 转换 |
@@ -508,6 +551,7 @@ python code/baselines_1d_burgers.py \
 - 高 beta 下定点平移受离散插值误差限制，需要使用可学习残差分支。
 - Diffusion-sorption 使用归一化时间坐标，不能直接复用 Burgers PDE residual。
 - 当前模型训练成本明显高于 FNO 和 DeepONet。
+- PINO 对比显示数据精度与 PDE 残差存在权衡；当前 PG 不是两个指标同时占优。
 - 二维 diffusion-reaction 当前从 `t=10` 的可辨识状态推进；从随机噪声 `t=0`
   直接预测全过程会出现严重信息损失，不能称为已解决该病态设定。
 - 二维实验使用 `64 x 64 x 41` 的降采样轨迹，尚未覆盖全分辨率、二维 NS、

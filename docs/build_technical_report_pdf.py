@@ -101,6 +101,12 @@ FIGURES = {
             "图 10. 一维 PG/FNO/DeepONet 推理效率。",
         ),
     ],
+    "### 5.9 PINO 对比": [
+        (
+            ROOT / "analysis_plots_clean" / "pino_comparison.png",
+            "图 11. PG-MS-LR-LPO 与参数匹配 PINO 的数据精度和 PDE 残差对比。",
+        )
+    ],
 }
 
 
@@ -535,6 +541,7 @@ def markdown_story(
         "### 5.5 残差分支三 seed 稳定性",
         "### 5.6 β=7 结构消融",
         "### 5.7 二维扩展结果",
+        "### 5.9 PINO 对比",
     }
 
     def flush_paragraph() -> None:

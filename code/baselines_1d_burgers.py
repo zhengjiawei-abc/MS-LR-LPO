@@ -1,10 +1,11 @@
 """External operator-learning baselines on 1D PDEBench tasks.
 
-Two standard baselines are trained on the same PDEBench splits and scored with
+Three baselines are trained on the same PDEBench splits and scored with
 the same relative-L2 metric:
 
 * ``fno``      -- Fourier Neural Operator mapping u0 -> u(x, t) on the grid.
 * ``deeponet`` -- branch/trunk network mapping (u0, x, t) -> u(x, t).
+* ``pino``     -- FNO backbone trained with data and normalized PDE residual.
 
 A time-mean predictor is also reported as a trivial floor.
 
@@ -27,6 +28,8 @@ import torch.nn.functional as F
 from torch import nn
 
 from burgers_common import (
+    NU,
+    T_FINAL,
     configure_backend,
     count_parameters,
     load_split,
@@ -185,6 +188,42 @@ def evaluate_fno(
     return float(np.mean(errors))
 
 
+def normalized_pde_residual(
+    fields: torch.Tensor,
+    equation: str,
+    beta: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Return normalized residual MSE and its RMS for 1D PDEBench fields."""
+    dx = 1.0 / fields.size(1)
+    dt = T_FINAL / max(fields.size(2) - 1, 1)
+    time_padded = F.pad(fields, (1, 1), mode="replicate")
+    u_t = (time_padded[:, :, 2:] - time_padded[:, :, :-2]) / (2 * dt)
+    u_x = (torch.roll(fields, -1, 1) - torch.roll(fields, 1, 1)) / (2 * dx)
+    if equation == "burgers":
+        u_xx = (
+            torch.roll(fields, -1, 1)
+            - 2.0 * fields
+            + torch.roll(fields, 1, 1)
+        ) / (dx * dx)
+        convective = fields * u_x
+        residual = u_t + convective - NU * u_xx
+        denominator = (
+            u_t.square()
+            + convective.square()
+            + (NU * u_xx).square()
+        )
+    elif equation == "advection":
+        convective = beta * u_x
+        residual = u_t + convective
+        denominator = u_t.square() + convective.square()
+    else:
+        raise ValueError(f"unsupported PINO equation: {equation}")
+    numerator = residual.square().mean(dim=(1, 2))
+    scale = denominator.mean(dim=(1, 2)).clamp_min(1.0e-12)
+    relative = (numerator / scale).mean()
+    return relative, relative.sqrt()
+
+
 def grid_coordinates(
     nx: int,
     nt: int,
@@ -275,6 +314,63 @@ def train_fno(
     }
 
 
+def train_pino(
+    fields: torch.Tensor,
+    args: argparse.Namespace,
+    device: torch.device,
+) -> Dict[str, object]:
+    nx, nt = fields.size(1), fields.size(2)
+    model = FNO1d(args.modes, args.width, args.layers, nt).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    scheduler = build_schedule(optimizer, args.lr, args.steps, args.warmup)
+    history = []
+    started = time.time()
+    for step in range(args.steps):
+        indices = torch.randint(
+            0, fields.size(0), (args.batch_size,), device=device
+        )
+        u0 = fields[indices, :, 0, 0]
+        target = fields[indices, :, :, 0]
+        prediction = model(u0)
+        data_loss = F.mse_loss(prediction, target)
+        pde_loss, pde_relative = normalized_pde_residual(
+            prediction,
+            args.equation,
+            args.pde_beta,
+        )
+        ramp = min(
+            1.0,
+            (step + 1) / max(args.physics_warmup, 1),
+        )
+        weighted_physics = args.physics_weight * ramp * pde_loss
+        loss = data_loss + weighted_physics
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        optimizer.step()
+        scheduler.step()
+        if step % args.log_every == 0 or step == args.steps - 1:
+            point = {
+                "step": step,
+                "loss": float(loss.detach()),
+                "data_loss": float(data_loss.detach()),
+                "pde_loss": float(pde_loss.detach()),
+                "pde_relative_rms": float(pde_relative.detach()),
+                "physics_ramp": ramp,
+            }
+            history.append(point)
+            print(
+                f"  step {step:>6}  data {point['data_loss']:.6f}  "
+                f"pde_rel {point['pde_relative_rms']:.6f}  "
+                f"total {point['loss']:.6f}"
+            )
+    return {
+        "model": model,
+        "history": history,
+        "seconds": time.time() - started,
+    }
+
+
 def train_deeponet(
     fields: torch.Tensor,
     args: argparse.Namespace,
@@ -317,9 +413,13 @@ def train_deeponet(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="FNO / DeepONet baselines on 1D PDEBench trajectories.",
+        description="FNO / PINO / DeepONet baselines on 1D PDEBench trajectories.",
     )
-    parser.add_argument("--model", choices=("fno", "deeponet"), default="fno")
+    parser.add_argument(
+        "--model",
+        choices=("fno", "pino", "deeponet"),
+        default="fno",
+    )
     parser.add_argument("--data-dir", type=str, default="datasets/pdebench_burgers")
     parser.add_argument("--dataset-prefix", default="burgers_nu0.01")
     parser.add_argument("--train-samples", type=int, default=512)
@@ -337,8 +437,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--branch-hidden", type=int, default=256)
     parser.add_argument("--trunk-hidden", type=int, default=128)
     parser.add_argument("--query-points", type=int, default=256)
+    parser.add_argument(
+        "--equation",
+        choices=("burgers", "advection"),
+        default="burgers",
+    )
+    parser.add_argument("--pde-beta", type=float, default=1.0)
+    parser.add_argument("--physics-weight", type=float, default=5.0e-4)
+    parser.add_argument("--physics-warmup", type=int, default=2000)
     parser.add_argument("--seed", type=int, default=23)
     parser.add_argument("--output-dir", type=str, required=True)
+    parser.add_argument("--save-model", action="store_true")
     parser.add_argument("--quick", action="store_true")
     return parser.parse_args()
 
@@ -381,8 +490,12 @@ def main() -> None:
     floor = relative_l2(time_mean, test_target)
     print(f"trivial time-mean baseline: {floor:.4f}")
 
-    if args.model == "fno":
-        result = train_fno(train_fields, args, device)
+    if args.model in ("fno", "pino"):
+        result = (
+            train_pino(train_fields, args, device)
+            if args.model == "pino"
+            else train_fno(train_fields, args, device)
+        )
         test_l2 = evaluate_fno(
             result["model"], test_fields, device, args.batch_size
         )
@@ -399,6 +512,21 @@ def main() -> None:
         dev_l2 = evaluate_deeponet(result["model"], dev_fields, device)
 
     parameters = count_parameters(result["model"])
+    test_pde_relative = None
+    test_pde_rms = None
+    if args.model in ("fno", "pino"):
+        test_prediction = []
+        result["model"].eval()
+        with torch.no_grad():
+            for start in range(0, test_fields.size(0), args.batch_size):
+                u0 = test_fields[start : start + args.batch_size, :, 0, 0]
+                test_prediction.append(result["model"](u0))
+        test_prediction = torch.cat(test_prediction, dim=0)
+        test_pde_relative, test_pde_rms = normalized_pde_residual(
+            test_prediction,
+            args.equation,
+            args.pde_beta,
+        )
     print(
         f"model={args.model}  params={parameters}  "
         f"train_L2={train_l2:.4f}  dev_L2={dev_l2:.4f}  test_L2={test_l2:.4f}  "
@@ -435,11 +563,25 @@ def main() -> None:
             "test_samples": args.test_samples,
             "dev_samples": args.dev_samples,
             "seed": args.seed,
+            "equation": args.equation,
+            "pde_beta": args.pde_beta,
+            "physics_weight": args.physics_weight,
+            "physics_warmup": args.physics_warmup,
         },
         "parameter_count": parameters,
         "train_relative_l2": train_l2,
         "dev_relative_l2": dev_l2,
         "test_relative_l2": test_l2,
+        "test_pde_relative_mse": (
+            float(test_pde_relative)
+            if test_pde_relative is not None
+            else None
+        ),
+        "test_pde_relative_rms": (
+            float(test_pde_rms)
+            if test_pde_rms is not None
+            else None
+        ),
         "trivial_time_mean_l2": floor,
         "training_seconds": result["seconds"],
         "history": result["history"],
@@ -448,6 +590,15 @@ def main() -> None:
         json.dumps(metrics, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
+    if args.save_model:
+        torch.save(
+            {
+                "state_dict": result["model"].state_dict(),
+                "model": args.model,
+                "config": metrics["config"],
+            },
+            output_dir / "model.pt",
+        )
     print(f"artifacts: {output_dir.resolve()}")
 
 
