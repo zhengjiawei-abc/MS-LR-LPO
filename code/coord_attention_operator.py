@@ -55,6 +55,7 @@ class OperatorConfig:
     grid_transport_refine_hidden: int = 0
     grid_physics_refiner: bool = False
     grid_physics_refiner_hidden: int = 0
+    grid_physics_refiner_kernel: int = 3
 
 
 class CoordinateEmbedding(nn.Module):
@@ -504,9 +505,19 @@ class CoordAttentionOperator(nn.Module):
         )
         self.grid_physics_refiner = (
             nn.Sequential(
-                nn.Conv2d(1, cfg.grid_physics_refiner_hidden, 3, padding=1),
+                nn.Conv2d(
+                    1,
+                    cfg.grid_physics_refiner_hidden,
+                    cfg.grid_physics_refiner_kernel,
+                    padding=cfg.grid_physics_refiner_kernel // 2,
+                ),
                 nn.SiLU(),
-                nn.Conv2d(cfg.grid_physics_refiner_hidden, 1, 3, padding=1),
+                nn.Conv2d(
+                    cfg.grid_physics_refiner_hidden,
+                    1,
+                    cfg.grid_physics_refiner_kernel,
+                    padding=cfg.grid_physics_refiner_kernel // 2,
+                ),
             )
             if cfg.grid_physics_refiner
             and cfg.grid_physics_refiner_hidden > 0

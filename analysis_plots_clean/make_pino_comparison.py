@@ -142,12 +142,7 @@ def pino_summary(task: str, weight_tag: str) -> dict:
     }
 
 
-def pg_refiner_summary() -> dict:
-    paths = [
-        REFINER / "burgers_h16_w01_4k" / "metrics.json",
-        REFINER / "burgers_h16_w01_4k_s11" / "metrics.json",
-        REFINER / "burgers_h16_w01_4k_s23" / "metrics.json",
-    ]
+def refiner_summary(paths: list[Path]) -> dict:
     metrics = [read_json(path) for path in paths]
     values = [float(item["test"]["l2"]) for item in metrics]
     pde_values = [
@@ -162,12 +157,32 @@ def pg_refiner_summary() -> dict:
     }
 
 
+def pg_refiner_summary() -> dict:
+    return refiner_summary(
+        [
+            REFINER / f"burgers_h24_k5_w01_4k_s{seed}" / "metrics.json"
+            for seed in (7, 11, 23)
+        ]
+    )
+
+
+def pg_refiner_accuracy_summary() -> dict:
+    return refiner_summary(
+        [
+            REFINER / "burgers_h16_w01_4k" / "metrics.json",
+            REFINER / "burgers_h16_w01_4k_s11" / "metrics.json",
+            REFINER / "burgers_h16_w01_4k_s23" / "metrics.json",
+        ]
+    )
+
+
 def pg_refiner_candidates() -> dict:
     paths = {
         "h16_w01_2k": EXP / "pg_physics_hpo" / "refiner_h16_w01_2k" / "metrics.json",
         "h32_w03_2k": EXP / "pg_physics_hpo" / "refiner_h32_w03_2k" / "metrics.json",
         "h64_w08_2k": EXP / "pg_physics_hpo" / "refiner_h64_w08_2k" / "metrics.json",
         "h16_w01_4k": REFINER / "burgers_h16_w01_4k" / "metrics.json",
+        "h24_k5_w01_4k": REFINER / "burgers_h24_k5_w01_4k_s7" / "metrics.json",
     }
     result = {}
     for name, path in paths.items():
@@ -185,7 +200,7 @@ def pg_refiner_candidates() -> dict:
             "best_step": int(metrics["best_step"]),
         }
     return {
-        "selected": "h16_w01_4k",
+        "selected": "h24_k5_w01_4k",
         "selection_rule": (
             "lowest residual under dev L2 <= initial dev L2 * 1.05"
         ),
@@ -279,6 +294,7 @@ def main() -> None:
         "Burgers": {
             "pg": burgers_pg,
             "pg_refiner": pg_refiner_summary(),
+            "pg_refiner_accuracy": pg_refiner_accuracy_summary(),
             "pino": pino_summary("burgers", "w0001"),
             "truth_pde_relative_rms": burgers_truth["relative_rms"],
             "fno_test_mean": 0.024588,
@@ -314,9 +330,13 @@ def main() -> None:
         json.dumps(weight_sweep(), ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    refiner_payload = pg_refiner_candidates()
+    refiner_payload["three_seed_residual_selected"] = pg_refiner_summary()
+    refiner_payload["three_seed_accuracy_alternative"] = (
+        pg_refiner_accuracy_summary()
+    )
     (OUT / "pg_physics_refiner_summary.json").write_text(
-        json.dumps(pg_refiner_candidates(), ensure_ascii=False, indent=2)
-        + "\n",
+        json.dumps(refiner_payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
 

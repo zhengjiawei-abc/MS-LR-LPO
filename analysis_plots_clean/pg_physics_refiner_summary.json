@@ -1,5 +1,5 @@
 {
-  "selected": "h16_w01_4k",
+  "selected": "h24_k5_w01_4k",
   "selection_rule": "lowest residual under dev L2 <= initial dev L2 * 1.05",
   "candidates": {
     "h16_w01_2k": {
@@ -41,6 +41,66 @@
       "parameter_count": 498860,
       "trainable_parameters": 305,
       "best_step": 4000
+    },
+    "h24_k5_w01_4k": {
+      "physics_weight": 0.01,
+      "refiner_hidden": 24,
+      "steps": 4000,
+      "test_l2": 0.01940632425248623,
+      "test_pde_relative_rms": 0.35366132855415344,
+      "parameter_count": 499780,
+      "trainable_parameters": 1225,
+      "best_step": 4000
     }
+  },
+  "three_seed_residual_selected": {
+    "values": [
+      0.01940632425248623,
+      0.01945878565311432,
+      0.01916017010807991
+    ],
+    "mean": 0.019341760004560154,
+    "std": 0.00015943405381769638,
+    "pde_relative_rms": {
+      "values": [
+        0.35366132855415344,
+        0.35361796617507935,
+        0.34592902660369873
+      ],
+      "mean": 0.3510694404443105,
+      "std": 0.004451781768409652
+    },
+    "parameters": 499780,
+    "trainable_parameters": 1225,
+    "paths": [
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k5_w01_4k_s7\\metrics.json",
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k5_w01_4k_s11\\metrics.json",
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k5_w01_4k_s23\\metrics.json"
+    ]
+  },
+  "three_seed_accuracy_alternative": {
+    "values": [
+      0.018718821927905083,
+      0.01877259463071823,
+      0.018792103976011276
+    ],
+    "mean": 0.018761173511544865,
+    "std": 3.795255085022374e-05,
+    "pde_relative_rms": {
+      "values": [
+        0.3708891272544861,
+        0.3752048909664154,
+        0.3693128824234009
+      ],
+      "mean": 0.37180230021476746,
+      "std": 0.003050304051939876
+    },
+    "parameters": 498860,
+    "trainable_parameters": 305,
+    "paths": [
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h16_w01_4k\\metrics.json",
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h16_w01_4k_s11\\metrics.json",
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h16_w01_4k_s23\\metrics.json"
+    ]
   }
 }

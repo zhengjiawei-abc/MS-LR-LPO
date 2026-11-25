@@ -16,7 +16,7 @@ SOURCES = {
     23: RUNS / "latent_pde_all_lowrank_joint_s23" / "model.pt",
 }
 KNOWN_OUTPUTS = {
-    7: OUTPUT / "burgers_h16_w01_4k",
+    ("burgers_h16_w01_4k", 7): OUTPUT / "burgers_h16_w01_4k",
 }
 
 
@@ -26,6 +26,8 @@ def main() -> None:
     parser.add_argument("--steps", type=int, default=4000)
     parser.add_argument("--physics-weight", type=float, default=0.01)
     parser.add_argument("--refiner-hidden", type=int, default=16)
+    parser.add_argument("--refiner-kernel", type=int, default=3)
+    parser.add_argument("--tag", default="burgers_h16_w01_4k")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
 
@@ -33,8 +35,8 @@ def main() -> None:
         if seed not in SOURCES:
             raise ValueError(f"unsupported seed: {seed}")
         output = KNOWN_OUTPUTS.get(
-            seed,
-            OUTPUT / f"burgers_h16_w01_4k_s{seed}",
+            (args.tag, seed),
+            OUTPUT / f"{args.tag}_s{seed}",
         )
         if (output / "metrics.json").exists() and not args.force:
             print(f"skip seed={seed}", flush=True)
@@ -59,6 +61,8 @@ def main() -> None:
             "--physics-refiner",
             "--refiner-hidden",
             str(args.refiner_hidden),
+            "--refiner-kernel",
+            str(args.refiner_kernel),
             "--freeze-backbone",
             "--max-l2-increase",
             "0.05",

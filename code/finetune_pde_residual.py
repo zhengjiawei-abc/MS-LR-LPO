@@ -54,6 +54,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pde-beta", type=float, default=1.0)
     parser.add_argument("--physics-refiner", action="store_true")
     parser.add_argument("--refiner-hidden", type=int, default=16)
+    parser.add_argument("--refiner-kernel", type=int, default=3)
     parser.add_argument("--freeze-backbone", action="store_true")
     return parser.parse_args()
 
@@ -104,6 +105,7 @@ def main() -> None:
     operator = dict(checkpoint["operator"])
     operator["grid_physics_refiner"] = args.physics_refiner
     operator["grid_physics_refiner_hidden"] = args.refiner_hidden
+    operator["grid_physics_refiner_kernel"] = args.refiner_kernel
     cfg = OperatorConfig(**operator)
     model = CoordAttentionOperator(cfg).to(device)
     model.load_state_dict(checkpoint["state_dict"], strict=False)
@@ -273,6 +275,7 @@ def main() -> None:
             "pde_beta": args.pde_beta,
             "physics_refiner": args.physics_refiner,
             "refiner_hidden": args.refiner_hidden,
+            "refiner_kernel": args.refiner_kernel,
             "freeze_backbone": args.freeze_backbone,
         },
         "training_seconds": time.time() - started,

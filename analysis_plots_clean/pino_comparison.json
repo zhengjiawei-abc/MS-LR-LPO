@@ -18,6 +18,31 @@
     },
     "pg_refiner": {
       "values": [
+        0.01940632425248623,
+        0.01945878565311432,
+        0.01916017010807991
+      ],
+      "mean": 0.019341760004560154,
+      "std": 0.00015943405381769638,
+      "pde_relative_rms": {
+        "values": [
+          0.35366132855415344,
+          0.35361796617507935,
+          0.34592902660369873
+        ],
+        "mean": 0.3510694404443105,
+        "std": 0.004451781768409652
+      },
+      "parameters": 499780,
+      "trainable_parameters": 1225,
+      "paths": [
+        "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k5_w01_4k_s7\\metrics.json",
+        "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k5_w01_4k_s11\\metrics.json",
+        "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k5_w01_4k_s23\\metrics.json"
+      ]
+    },
+    "pg_refiner_accuracy": {
+      "values": [
         0.018718821927905083,
         0.01877259463071823,
         0.018792103976011276
@@ -63,7 +88,7 @@
     "truth_pde_relative_rms": 0.21322841942310333,
     "fno_test_mean": 0.024588,
     "welch_p_vs_pg": 0.00252089507914524,
-    "welch_p_refiner_vs_pino": 0.0015552112120074788
+    "welch_p_refiner_vs_pino": 0.0005768522585440658
   },
   "Advection beta=1": {
     "pg": {
