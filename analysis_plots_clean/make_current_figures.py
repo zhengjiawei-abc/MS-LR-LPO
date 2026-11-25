@@ -205,9 +205,9 @@ def performance_comparison():
                 ),
                 np.mean(
                     [
-                        read_json(RUNS / "deeponet_pm501_s7_24k" / "metrics.json")["test_relative_l2"],
-                        read_json(RUNS / "deeponet_pm501_s11_24k" / "metrics.json")["test_relative_l2"],
-                        read_json(RUNS / "deeponet_pm501_s23_24k" / "metrics.json")["test_relative_l2"],
+                        read_json(RUNS / "deeponet_pm501_dense_s7_24k" / "metrics.json")["test_relative_l2"],
+                        read_json(RUNS / "deeponet_pm501_dense_s11_24k" / "metrics.json")["test_relative_l2"],
+                        read_json(RUNS / "deeponet_pm501_dense_s23_24k" / "metrics.json")["test_relative_l2"],
                     ]
                 ),
             ],
@@ -235,9 +235,9 @@ def performance_comparison():
                 ),
                 np.mean(
                     [
-                        read_json(CROSS / "full" / "diff_sorp" / "deeponet" / "metrics.json")["test_relative_l2"],
-                        read_json(CROSS / "seeds" / "diff_sorp" / "deeponet_s11" / "metrics.json")["test_relative_l2"],
-                        read_json(CROSS / "seeds" / "diff_sorp" / "deeponet_s23" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "deeponet_high_supervision" / "diff_sorp" / "deeponet_high4096_s7_high4096" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "deeponet_high_supervision" / "diff_sorp" / "deeponet_high4096_s11_high4096" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "deeponet_high_supervision" / "diff_sorp" / "deeponet_high4096_s23_high4096" / "metrics.json")["test_relative_l2"],
                     ]
                 ),
             ],
@@ -253,9 +253,9 @@ def performance_comparison():
                 ),
                 np.mean(
                     [
-                        read_json(CROSS / "improve_advection" / "comparison" / "deeponet" / "metrics.json")["test_relative_l2"],
-                        read_json(CROSS / "seeds" / "advection_beta1" / "deeponet_s11" / "metrics.json")["test_relative_l2"],
-                        read_json(CROSS / "seeds" / "advection_beta1" / "deeponet_s23" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "deeponet_high_supervision" / "advection_beta1" / "deeponet_high4096_s7_high4096" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "deeponet_high_supervision" / "advection_beta1" / "deeponet_high4096_s11_high4096" / "metrics.json")["test_relative_l2"],
+                        read_json(CROSS / "deeponet_high_supervision" / "advection_beta1" / "deeponet_high4096_s23_high4096" / "metrics.json")["test_relative_l2"],
                     ]
                 ),
             ],
@@ -287,7 +287,8 @@ def performance_comparison():
     axis.set_ylabel("Relative Test L2 (log scale, lower is better)")
     axis.set_title(
         "PG-MS-LR-LPO across PDEBench tasks\n"
-        "Standard model: 501,435 params | FNO: 502,997-503,165 | DeepONet: 501,473",
+        "Standard model: 501,435 params | FNO: 502,997-503,165 | "
+        "DeepONet: 501,473 params, 4096 queries",
         pad=16,
         fontsize=14,
         linespacing=1.45,

@@ -1,24 +1,80 @@
 {
-  "low_supervision": {
-    "query_points": 256,
-    "test_values": [
-      0.26797379248682407,
-      0.26148782440274954,
-      0.26865998771134764
-    ],
-    "test_mean": 0.2660405348669737,
-    "test_std": 0.003957662870916649,
-    "training_seconds_mean": 93.80731288592021
+  "Burgers": {
+    "low_supervision": {
+      "query_points": 256,
+      "test_values": [
+        0.26797379248682407,
+        0.26148782440274954,
+        0.26865998771134764
+      ],
+      "test_mean": 0.2660405348669737,
+      "test_std": 0.003957662870916649,
+      "training_seconds_mean": 93.80731288592021,
+      "parameters": 501473
+    },
+    "high_supervision": {
+      "query_points": 4096,
+      "test_values": [
+        0.2500127962538973,
+        0.2504732534177601,
+        0.2589657016582787
+      ],
+      "test_mean": 0.2531505837766454,
+      "test_std": 0.005041299652163817,
+      "training_seconds_mean": 564.4972035884857,
+      "parameters": 501473
+    }
   },
-  "high_supervision": {
-    "query_points": 4096,
-    "test_values": [
-      0.2500127962538973,
-      0.2504732534177601,
-      0.2589657016582787
-    ],
-    "test_mean": 0.2531505837766454,
-    "test_std": 0.005041299652163817,
-    "training_seconds_mean": 564.4972035884857
+  "Advection beta=1": {
+    "low_supervision": {
+      "query_points": 256,
+      "test_values": [
+        0.4407648706752807,
+        0.501916557374876,
+        0.5484587607905269
+      ],
+      "test_mean": 0.4970467296135612,
+      "test_std": 0.05401184970779408,
+      "training_seconds_mean": 60.48830032348633,
+      "parameters": 501473
+    },
+    "high_supervision": {
+      "query_points": 4096,
+      "test_values": [
+        0.49285367590002715,
+        0.5114244981938973,
+        0.48486512183537706
+      ],
+      "test_mean": 0.49638109864310054,
+      "test_std": 0.013626523824682693,
+      "training_seconds_mean": 1456.4847306410472,
+      "parameters": 501473
+    }
+  },
+  "Diffusion-sorption": {
+    "low_supervision": {
+      "query_points": 256,
+      "test_values": [
+        0.014916746811009943,
+        0.02098686543107033,
+        0.01746827019751072
+      ],
+      "test_mean": 0.017790627479863663,
+      "test_std": 0.0030478714996724243,
+      "training_seconds_mean": 60.53555345535278,
+      "parameters": 501473
+    },
+    "high_supervision": {
+      "query_points": 4096,
+      "test_values": [
+        0.012845903034321964,
+        0.019713767763227225,
+        0.014615993215702474
+      ],
+      "test_mean": 0.015725221337750554,
+      "test_std": 0.003565765240967493,
+      "training_seconds_mean": 1458.5438141822815,
+      "parameters": 501473
+    }
   }
 }

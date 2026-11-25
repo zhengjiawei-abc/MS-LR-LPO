@@ -52,11 +52,26 @@ def style_axis(axis) -> None:
 
 
 def parameter_sweep() -> None:
-    betas = [0.2, 0.7, 1.0, 2.0, 4.0, 7.0]
-    fixed = [0.001645, 0.003762, 0.004543, 0.008304, 0.017987, 0.033748]
-    residual = [None, None, None, 0.005043, 0.007183, 0.011352]
-    fno = [0.005010, 0.006435, 0.006626, 0.006389, 0.007262, 0.009003]
-    deeponet = [0.132452, 0.326126, 0.497047, 0.623089, 0.701016, 0.706937]
+    results = read_json(OUT / "advection_eight_parameter_summary.json")
+    residual_summary = read_json(OUT / "residual_seed_summary.json")
+    betas = [0.1, 0.2, 0.4, 0.7, 1.0, 2.0, 4.0, 7.0]
+    fixed = [
+        results[f"beta{beta:g}"]["fixed_transport"]
+        for beta in betas
+    ]
+    residual_lookup = {
+        beta: residual_summary[key]["test_mean"]
+        for beta, key in ((2.0, "beta2"), (4.0, "beta4"), (7.0, "beta7"))
+    }
+    residual = [residual_lookup.get(beta) for beta in betas]
+    fno = [
+        results[f"beta{beta:g}"]["fno"]["test_mean"]
+        for beta in betas
+    ]
+    deeponet = [
+        results[f"beta{beta:g}"]["deeponet"]["test_mean"]
+        for beta in betas
+    ]
     best_pg = [
         fixed_value if residual_value is None else min(fixed_value, residual_value)
         for fixed_value, residual_value in zip(fixed, residual)
@@ -112,8 +127,8 @@ def parameter_sweep() -> None:
         )
     axis.annotate(
         "FNO still wins at beta=7",
-        xy=(5, fno[-1]),
-        xytext=(4.1, 0.013),
+        xy=(7, fno[-1]),
+        xytext=(5.8, 0.013),
         color=FNO,
         fontsize=9,
         arrowprops={"arrowstyle": "-|>", "color": FNO, "linewidth": 1.4},
@@ -123,8 +138,8 @@ def parameter_sweep() -> None:
     axis.set_xlabel("Advection coefficient beta")
     axis.set_ylabel("Relative Test L2 (log scale, lower is better)")
     axis.set_title(
-        "PG-MS-LR-LPO parameter sweep\n"
-        "Three-seed means for FNO/DeepONet; deterministic physical branch for PG",
+        "PG-MS-LR-LPO official eight-beta parameter sweep\n"
+        "Three-seed means for FNO/DeepONet; deterministic transport for PG",
         fontsize=14,
         linespacing=1.45,
         pad=16,

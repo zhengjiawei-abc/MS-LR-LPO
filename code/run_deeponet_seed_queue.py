@@ -17,10 +17,17 @@ def main() -> None:
     parser.add_argument("--query-points", type=int, default=256)
     parser.add_argument("--steps", type=int, default=24000)
     parser.add_argument("--output-prefix", default="deeponet_pm501")
+    parser.add_argument("--output-suffix", default="24k")
+    parser.add_argument("--data-dir", type=Path, default=DATA)
+    parser.add_argument("--run-dir", type=Path, default=RUNS)
+    parser.add_argument("--dataset-prefix", default="burgers_nu0.01")
     args = parser.parse_args()
 
     for seed in args.seeds:
-        output = RUNS / f"{args.output_prefix}_s{seed}_24k"
+        output = (
+            args.run_dir
+            / f"{args.output_prefix}_s{seed}_{args.output_suffix}"
+        )
         if (output / "metrics.json").exists():
             print(f"skip seed {seed}", flush=True)
             continue
@@ -32,7 +39,9 @@ def main() -> None:
                 "--model",
                 "deeponet",
                 "--data-dir",
-                str(DATA),
+                str(args.data_dir),
+                "--dataset-prefix",
+                args.dataset_prefix,
                 "--train-samples",
                 "8000",
                 "--dev-samples",

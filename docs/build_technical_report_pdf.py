@@ -60,7 +60,7 @@ FIGURES = {
     "### 5.3 Advection 参数扫描": [
         (
             ROOT / "analysis_plots_clean" / "parameter_sweep_comparison.png",
-            "图 3. 六个 advection beta 下的参数扫描结果。",
+            "图 3. 官方八个 advection beta 下的参数扫描结果。",
         )
     ],
     "### 5.4 残差训练预算": [
@@ -94,7 +94,7 @@ FIGURES = {
     "### 5.8 一维效率与高监督 DeepONet": [
         (
             ROOT / "analysis_plots_clean" / "deeponet_supervision.png",
-            "图 9. Burgers DeepONet 监督点数消融。",
+            "图 9. 三个一维任务的 DeepONet 监督点数消融。",
         ),
         (
             ROOT / "analysis_plots_clean" / "efficiency_1d_summary.png",
@@ -460,7 +460,7 @@ def cover_story(styles: dict[str, ParagraphStyle]) -> list:
     summary = [
         ["研究范围", "PDEBench 一维标量方程与二维扩展"],
         ["主要任务", "Burgers / diffusion-sorption / advection"],
-        ["参数网格", "beta = 0.2, 0.7, 1.0, 2.0, 4.0, 7.0"],
+        ["参数网格", "beta = 0.1, 0.2, 0.4, 0.7, 1.0, 2.0, 4.0, 7.0"],
         ["标准参数预算", "501,435"],
         ["参数匹配 FNO", "503,165"],
         ["版本日期", "2026-11-25"],

@@ -3,10 +3,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import threading
 import time
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from pathlib import Path
 
 
@@ -28,16 +27,10 @@ def content_length(url: str) -> int:
         length = response.headers.get("Content-Length")
         if length and int(length) > 1:
             return int(length)
-    raise RuntimeError("Could not determine remote file size")
+    raise RuntimeError("could not determine remote file size")
 
 
-def download_chunk(
-    url: str,
-    path: Path,
-    start: int,
-    end: int,
-    report,
-) -> None:
+def download_chunk(url: str, path: Path, start: int, end: int) -> None:
     expected = end - start + 1
     if path.exists() and path.stat().st_size > expected:
         with path.open("r+b") as handle:
@@ -45,7 +38,6 @@ def download_chunk(
     for attempt in range(1, 11):
         offset = path.stat().st_size if path.exists() else 0
         if offset >= expected:
-            report(path, expected - offset)
             return
         try:
             with urllib.request.urlopen(
@@ -53,14 +45,15 @@ def download_chunk(
                 timeout=120,
             ) as response:
                 if response.status != 206:
-                    raise RuntimeError(f"range request returned HTTP {response.status}")
+                    raise RuntimeError(
+                        f"range request returned HTTP {response.status}"
+                    )
                 with path.open("ab") as handle:
                     while True:
                         block = response.read(1024 * 1024)
                         if not block:
                             break
                         handle.write(block)
-                        report(path, len(block))
             if path.stat().st_size != expected:
                 raise RuntimeError(
                     f"chunk size {path.stat().st_size} != expected {expected}"
@@ -70,7 +63,7 @@ def download_chunk(
             if attempt == 10:
                 raise
             print(f"retry {attempt} {path.name}: {error}", flush=True)
-            time.sleep(min(2 ** attempt, 30))
+            time.sleep(min(2**attempt, 30))
 
 
 def md5(path: Path, block_size: int = 1024 * 1024) -> str:
@@ -96,27 +89,24 @@ def main() -> None:
     chunks = []
     for index, start in enumerate(range(0, total, chunk_bytes)):
         end = min(start + chunk_bytes, total) - 1
-        chunks.append((index, start, end, args.output.with_suffix(
-            args.output.suffix + f".part{index:03d}"
-        )))
+        chunks.append(
+            (
+                index,
+                start,
+                end,
+                args.output.with_suffix(args.output.suffix + f".part{index:03d}"),
+            )
+        )
     print(
         f"download {total / 1e9:.3f} GB in {len(chunks)} chunks, "
         f"{args.connections} connections",
         flush=True,
     )
 
-    lock = threading.Lock()
-    transferred = 0
-
-    def report(path: Path, amount: int) -> None:
-        nonlocal transferred
-        with lock:
-            transferred += max(0, amount)
-
     started = time.time()
     with ThreadPoolExecutor(max_workers=args.connections) as pool:
         futures = {
-            pool.submit(download_chunk, args.url, path, start, end, report):
+            pool.submit(download_chunk, args.url, path, start, end):
             (index, start, end, path)
             for index, start, end, path in chunks
             if not (
@@ -125,7 +115,7 @@ def main() -> None:
             )
         }
         while futures:
-            done, pending = wait(
+            done, _ = wait(
                 futures,
                 timeout=15,
                 return_when=FIRST_COMPLETED,

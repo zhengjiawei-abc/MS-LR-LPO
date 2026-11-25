@@ -24,12 +24,16 @@ PDF 版本见
 一维 advection 在 ±20% 参数先验、8 个时间快照和 0–10% 噪声下，β 反演
 100% 落在 5% 误差内，MAPE 为 `0.036%–0.049%`。
 
+PDEBench 官方 advection 的八个 β 已全部补齐。低 β 的解析平移分支保持领先，
+高 β 的失败边界仍然从 β=2 开始出现。
+
 β=2、4、7 的最终残差阶段已完成三 seed 稳定性检查。β=2、4 仍优于参数匹配 FNO；
 β=7 三 seed 均值为 `0.011357 ± 0.000008`，仍落后 FNO 的 `0.009003`。
 
-Burgers 高监督 DeepONet 三 seed 为 `0.2532 ± 0.0050`，仍落后 PG
-`0.0198` 与 FNO `0.0246`。1D 推理延迟 PG `22.0 ms`、FNO `1.20 ms`、
-DeepONet `6.07 ms`（batch=32）。
+三个一维任务的 4096 查询点高监督 DeepONet 三 seed 已完成。Burgers
+`0.2532 ± 0.0050`、advection β=1 `0.4964 ± 0.0136`、diffusion-sorption
+`0.0157 ± 0.0036`，仍全部落后对应 PG。1D 推理延迟 PG `22.0 ms`、FNO
+`1.20 ms`、DeepONet `6.07 ms`（batch=32）。
 
 ```text
 u0(x) -> context encoder
@@ -86,7 +90,7 @@ u0(x) -> context encoder
 
 ![Bounded advection beta inversion](analysis_plots_clean/bounded_beta_inference.png)
 
-![Burgers DeepONet supervision ablation](analysis_plots_clean/deeponet_supervision.png)
+![DeepONet supervision ablation across 1D tasks](analysis_plots_clean/deeponet_supervision.png)
 
 ![PDEBench 1D efficiency](analysis_plots_clean/efficiency_1d_summary.png)
 
@@ -119,20 +123,20 @@ Burgers 和 diffusion-sorption 没有已知常速平移项，因此关闭该分�
 
 | 数据集 | 原 MS-LR-LPO | PG-MS-LR-LPO | FNO | DeepONet |
 |---|---:|---:|---:|---:|
-| Burgers `Nu=0.01` | 0.019759 | **0.019758** | 0.024355 | 0.267974 |
-| 1D diffusion-sorption | 0.003312 | **0.003310** | 0.701195 | 0.014917 |
-| 1D advection `beta=1.0` | 0.017053 | **0.004543** | 0.006542 | 0.440765 |
+| Burgers `Nu=0.01` | 0.019759 | **0.019758** | 0.024355 | 0.250013 |
+| 1D diffusion-sorption | 0.003312 | **0.003310** | 0.701195 | 0.012846 |
+| 1D advection `beta=1.0` | 0.017053 | **0.004543** | 0.006542 | 0.492854 |
 
 物理引导模型相对两个参数匹配 baseline：
 
 | 数据集 | 比 FNO 低 | 比 DeepONet 低 |
 |---|---:|---:|
-| Burgers | 19.61% | 92.57% |
-| Diffusion-sorption | 99.52% | 81.06% |
-| Advection | 31.44% | 99.09% |
+| Burgers | 19.61% | 92.19% |
+| Diffusion-sorption | 99.52% | 78.57% |
+| Advection | 31.44% | 99.08% |
 
-DeepONet 每个训练步只随机采样 `256` 个时空点进行监督；PG-MS-LR-LPO 和 FNO 使用完整
-`256 x 101` 输出场。因此 DeepONet 数字反映当前标准配置，不应被解释为完全相同的监督条件。
+主表的 Burgers、advection β=1 和 diffusion-sorption 使用每步 `4096` 个查询点的
+高监督 DeepONet。其余 advection β 仍使用标准 `256` 查询点，并在对应章节注明。
 
 下面的百分比汇总和性能图使用三 seed 均值；主表保留 seed 7 原始值，便于逐项核对。
 
@@ -140,9 +144,10 @@ DeepONet 每个训练步只随机采样 `256` 个时空点进行监督；PG-MS-L
 
 当前可支持的结论是：
 
-- 在 Burgers `Nu=0.01`、diffusion-sorption 和已测六个 advection β 上，
+- 在 Burgers `Nu=0.01`、diffusion-sorption 和官方八个 advection β 上，
   PG-MS-LR-LPO 在绝大多数设置中优于参数匹配 FNO。
-- 在所有已测设置中，PG-MS-LR-LPO 均优于标准 DeepONet。
+- 在所有已测设置中，PG-MS-LR-LPO 均优于参数匹配 DeepONet，包括已完成
+  4096 查询点高监督版本的三个一维任务。
 - β=2、4 的可学习残差可以超过 FNO；β=7 的高频分支三 seed 最终阶段均值为
   `0.011357 ± 0.000008`，仍落后 FNO 的 `0.009003`，是当前明确失败案例。
 - β=2、4、7 的三 seed 只改变最终残差微调阶段，三个 seed 共享早期 checkpoint；
@@ -151,11 +156,12 @@ DeepONet 每个训练步只随机采样 `256` 个时空点进行监督；PG-MS-L
 尚不能声称“全面超过官方 PDEBench”：
 
 - Burgers 只使用 `Nu=0.01`，不是全部 12 个粘度文件。
-- Advection 使用了 6 个 β，尚缺官方 `0.1` 和 `0.4`。
+- Advection 已覆盖官方 `0.1, 0.2, 0.4, 0.7, 1.0, 2.0, 4.0, 7.0`。
 - 1D CFD、2D CFD、Darcy 和 SWE 尚未执行；NS 只覆盖二维力条件速度场子集，
   尚无完整压力场和全分辨率结果。
 - FNO/DeepONet 是项目内的参数匹配实现，不是 PDEBench 官方榜单结果。
-- DeepONet 仍使用 256 点随机监督，需要补充全监督版本。
+- 其余 advection β 的 DeepONet 仍使用 256 点随机监督；三个主要一维任务已完成
+  4096 点高监督版本。
 
 ## Advection 改进
 
@@ -179,7 +185,8 @@ Test L2 = 0.004543
 |---|---:|---:|---:|---:|
 | PG-MS-LR-LPO | 0.004543 | 0.004543 | 0.004543 | **0.004543 +- 0** |
 | 参数匹配 FNO | 0.006542 | 0.006749 | 0.006586 | 0.006626 +- 0.000109 |
-| 参数匹配 DeepONet | 0.440765 | 0.501917 | 0.548459 | 0.497047 +- 0.054012 |
+| 参数匹配 DeepONet，256 点 | 0.440765 | 0.501917 | 0.548459 | 0.497047 +- 0.054012 |
+| 参数匹配 DeepONet，4096 点 | 0.492854 | 0.511424 | 0.484865 | **0.496381 +- 0.013627** |
 
 PG 对 FNO 的 Welch p 为 `0.00091`，对 DeepONet 为 `0.00399`。
 
@@ -188,7 +195,7 @@ PG 对 FNO 的 Welch p 为 `0.00091`，对 DeepONet 为 `0.00399`。
 `beta=2.0` 时，线性平移的离散误差明显增大。固定平移 Test L2 为 `0.008304`，
 反而落后 FNO 的 `0.006300`。将融合系数设为可学习，并从固定平移解继续训练 4K 步后：
 
-本段保留 seed 7 的优化轨迹；下面的六参数汇总改用 FNO/DeepONet 三 seed 均值，
+本段保留 seed 7 的优化轨迹；下面的八参数汇总改用 FNO/DeepONet 三 seed 均值，
 因此 β=2 的 FNO 数值为 `0.006389`。
 
 | beta=2.0 方法 | 参数 | Test L2 |
@@ -213,19 +220,23 @@ PG 对 FNO 的 Welch p 为 `0.00091`，对 DeepONet 为 `0.00399`。
 当前 advection 参数网格已扩展到：
 
 ```text
-beta = 0.2, 0.7, 1.0, 2.0, 4.0, 7.0
+beta = 0.1, 0.2, 0.4, 0.7, 1.0, 2.0, 4.0, 7.0
 ```
 
-六参数 Test L2（FNO/DeepONet 为三 seed 均值；可学习残差为最终阶段三 seed）：
+八参数 Test L2（FNO/DeepONet 为三 seed 均值；可学习残差为最终阶段三 seed）：
 
 | beta | 固定平移 PG | 可学习残差 PG | FNO | DeepONet |
 |---:|---:|---:|---:|---:|
+| 0.1 | **0.001154** | - | 0.003802 | 0.115324 |
 | 0.2 | **0.001645** | - | 0.005010 | 0.132452 |
+| 0.4 | **0.002547** | - | 0.006037 | 0.243269 |
 | 0.7 | **0.003762** | - | 0.006435 | 0.326126 |
-| 1.0 | **0.004543** | - | 0.006626 | 0.497047 |
+| 1.0 | **0.004543** | - | 0.006626 | 0.496381 |
 | 2.0 | 0.008304 | **0.005043 ± 0.000002** | 0.006389 | 0.623089 |
 | 4.0 | 0.017987 | **0.007183 ± 0.000001** | 0.007262 | 0.701016 |
 | 7.0 | 0.033748 | 0.011357 ± 0.000008 | **0.009003** | 0.706937 |
+
+DeepONet 在 β=1 行使用 4096 点高监督，其余 advection 参数使用 256 点标准配置。
 
 β≤1 时解析平移已经很强；β≥2 后离散插值误差快速增大，必须依靠可学习残差。
 β=2 和 β=4 的独立残差模型已经重新超过 FNO。β=7 的最强变体使用 128 点解码网格、
@@ -266,7 +277,8 @@ beta = 0.2, 0.7, 1.0, 2.0, 4.0, 7.0
 |---|---:|---:|---:|---:|
 | PG-MS-LR-LPO，平移分支关闭 | 0.019759 | 0.019775 | 0.019767 | **0.019767 +- 0.000008** |
 | 参数匹配 FNO | 0.024355 | 0.024388 | 0.025020 | 0.024588 +- 0.000375 |
-| 参数匹配 DeepONet | 0.267974 | 0.261488 | 0.268660 | 0.266041 +- 0.003958 |
+| 参数匹配 DeepONet，256 点 | 0.267974 | 0.261488 | 0.268660 | 0.266041 +- 0.003958 |
+| 参数匹配 DeepONet，4096 点 | 0.250013 | 0.250473 | 0.258966 | **0.253151 +- 0.005041** |
 
 与 FNO 的三 seed Welch t 检验为 `p = 0.0020`。
 
@@ -276,9 +288,10 @@ beta = 0.2, 0.7, 1.0, 2.0, 4.0, 7.0
 |---|---:|---:|---:|---:|
 | PG-MS-LR-LPO | 0.003312 | 0.003326 | 0.003472 | **0.003370 +- 0.000089** |
 | 最佳参数匹配 FNO | 0.701195 | 0.701195 | 0.701195 | 0.701195 +- 0.000000 |
-| 参数匹配 DeepONet | 0.014917 | 0.020987 | 0.017468 | 0.017791 +- 0.003048 |
+| 参数匹配 DeepONet，256 点 | 0.014917 | 0.020987 | 0.017468 | 0.017791 +- 0.003048 |
+| 参数匹配 DeepONet，4096 点 | 0.012846 | 0.019714 | 0.014616 | **0.015725 +- 0.003566** |
 
-PG 对 FNO 的 Welch p 为 `5.37e-9`，对 DeepONet 为 `0.0145`。
+PG 对 FNO 的 Welch p 为 `5.37e-9`，对高监督 DeepONet 为 `0.0266`。
 
 ## 参数口径
 
@@ -465,9 +478,14 @@ python code/baselines_1d_burgers.py \
 | `code/benchmark_1d_models.py` | 1D 参数、延迟、吞吐与显存基准 |
 | `code/run_cross_pde_matrix.py` | Burgers、advection、diffusion-sorption 四模型矩阵 |
 | `code/run_residual_seed_queue.py` | β=2、4、7 最终残差阶段 seed 队列 |
+| `code/run_advection_beta_queue.py` | 新 advection β 的固定平移与匹配基线队列 |
+| `analysis_plots_clean/compile_advection_eight.py` | 官方八个 β 的三方结果汇总 |
+| `analysis_plots_clean/make_deeponet_supervision.py` | 三个 1D 任务的高监督 DeepONet 对比 |
 | `code/evaluate_advection_beta_inference.py` | advection β 多参数反演与离散可辨识性诊断 |
 | `code/burgers_common.py` | 数据读取、split 解析、误差与坐标工具 |
 | `datasets/pdebench_group_to_parquet.py` | 分组和整块 tensor 两种 PDEBench 1D HDF5 转换 |
+| `datasets/download_parallel.py` | 大文件 HTTP Range 分片续传与 MD5 校验 |
+| `datasets/pdebench_advection_sources.json` | 官方八个 advection 文件 URL 与 MD5 |
 | `code/coord_attention_operator_2d.py` | 二维潜空间谱 PDE、多尺度编码和分解式时空解码 |
 | `code/train_operator_2d.py` | PG/FNO/DeepONet 二维统一训练、相对时刻损失和早停 |
 | `code/baselines_2d.py` | 参数匹配二维 FNO 与 Fourier-trunk DeepONet 基线 |
@@ -483,6 +501,8 @@ python code/baselines_1d_burgers.py \
 
 - Burgers、diffusion-sorption、advection 的模型对比均补齐三 seed；
   advection 物理分支输出确定，因此标准差为 0。
+- 官方 advection 八个 β 已全部补齐；FNO/DeepONet 为三 seed，解析平移为确定性结果。
+- 三个一维任务、五组参数匹配 baseline、完整官方 advection 网格和高监督消融均已补齐。
 - β=2、4、7 的可学习残差仅完成最终阶段三 seed；早期 checkpoint 仍共享。
 - 周期平移分支只适用于已知常速、周期边界的线性平流。
 - 高 beta 下定点平移受离散插值误差限制，需要使用可学习残差分支。
@@ -497,6 +517,8 @@ python code/baselines_1d_burgers.py \
 - NS 已加入速度散度约束，并显式输入 `(f_x, f_y)` 外力，但官方文件没有
   压力场，因此尚未加入完整 NS 动量方程残差；结果也只覆盖 `64 x 64` 和
   四条官方轨迹。
+- 当前 NS 文件固定 `NU=0.01` 和 `force_scale=0.15`，四条轨迹没有参数标签
+  变化，因此不能据此外报二维 NS 标量参数反演；需要额外参数化轨迹。
 - 二维最终轻量配置去掉非线性潜空间谱混合块，保留 Fourier 线性推进和
   multi-scale skip；该配置在 reaction/NS 上都优于带谱块版本。
 - PG 精度优于 FNO，但当前推理延迟约为 FNO 的 14–15 倍，峰值显存约 231 MB
