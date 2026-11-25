@@ -160,7 +160,7 @@ def refiner_summary(paths: list[Path]) -> dict:
 def pg_refiner_summary() -> dict:
     return refiner_summary(
         [
-            REFINER / f"burgers_h24_k5_w01_4k_s{seed}" / "metrics.json"
+            REFINER / f"burgers_h24_k9_w01_ext4k_s{seed}" / "metrics.json"
             for seed in (7, 11, 23)
         ]
     )
@@ -176,6 +176,15 @@ def pg_refiner_accuracy_summary() -> dict:
     )
 
 
+def pg_refiner_mid_summary() -> dict:
+    return refiner_summary(
+        [
+            REFINER / f"burgers_h24_k5_w01_4k_s{seed}" / "metrics.json"
+            for seed in (7, 11, 23)
+        ]
+    )
+
+
 def pg_refiner_candidates() -> dict:
     paths = {
         "h16_w01_2k": EXP / "pg_physics_hpo" / "refiner_h16_w01_2k" / "metrics.json",
@@ -183,6 +192,10 @@ def pg_refiner_candidates() -> dict:
         "h64_w08_2k": EXP / "pg_physics_hpo" / "refiner_h64_w08_2k" / "metrics.json",
         "h16_w01_4k": REFINER / "burgers_h16_w01_4k" / "metrics.json",
         "h24_k5_w01_4k": REFINER / "burgers_h24_k5_w01_4k_s7" / "metrics.json",
+        "h24_k9_w01_4k": REFINER / "burgers_h24_k9_w01_4k_s7" / "metrics.json",
+        "h24_k9_w01_ext4k": (
+            REFINER / "burgers_h24_k9_w01_ext4k_s7" / "metrics.json"
+        ),
     }
     result = {}
     for name, path in paths.items():
@@ -200,7 +213,7 @@ def pg_refiner_candidates() -> dict:
             "best_step": int(metrics["best_step"]),
         }
     return {
-        "selected": "h24_k5_w01_4k",
+        "selected": "h24_k9_w01_ext4k",
         "selection_rule": (
             "lowest residual under dev L2 <= initial dev L2 * 1.05"
         ),
@@ -335,6 +348,7 @@ def main() -> None:
     refiner_payload["three_seed_accuracy_alternative"] = (
         pg_refiner_accuracy_summary()
     )
+    refiner_payload["three_seed_mid_capacity"] = pg_refiner_mid_summary()
     (OUT / "pg_physics_refiner_summary.json").write_text(
         json.dumps(refiner_payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",

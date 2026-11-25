@@ -1,5 +1,5 @@
 {
-  "selected": "h24_k5_w01_4k",
+  "selected": "h24_k9_w01_ext4k",
   "selection_rule": "lowest residual under dev L2 <= initial dev L2 * 1.05",
   "candidates": {
     "h16_w01_2k": {
@@ -51,31 +51,51 @@
       "parameter_count": 499780,
       "trainable_parameters": 1225,
       "best_step": 4000
+    },
+    "h24_k9_w01_4k": {
+      "physics_weight": 0.01,
+      "refiner_hidden": 24,
+      "steps": 4000,
+      "test_l2": 0.01949777640402317,
+      "test_pde_relative_rms": 0.3025401830673218,
+      "parameter_count": 502468,
+      "trainable_parameters": 3913,
+      "best_step": 4000
+    },
+    "h24_k9_w01_ext4k": {
+      "physics_weight": 0.01,
+      "refiner_hidden": 24,
+      "steps": 4000,
+      "test_l2": 0.019381208345294,
+      "test_pde_relative_rms": 0.28964775800704956,
+      "parameter_count": 502468,
+      "trainable_parameters": 3913,
+      "best_step": 4000
     }
   },
   "three_seed_residual_selected": {
     "values": [
-      0.01940632425248623,
-      0.01945878565311432,
-      0.01916017010807991
+      0.019381208345294,
+      0.01952911540865898,
+      0.01946086995303631
     ],
-    "mean": 0.019341760004560154,
-    "std": 0.00015943405381769638,
+    "mean": 0.01945706456899643,
+    "std": 7.402692455506624e-05,
     "pde_relative_rms": {
       "values": [
-        0.35366132855415344,
-        0.35361796617507935,
-        0.34592902660369873
+        0.28964775800704956,
+        0.2917223870754242,
+        0.2881467044353485
       ],
-      "mean": 0.3510694404443105,
-      "std": 0.004451781768409652
+      "mean": 0.2898389498392741,
+      "std": 0.0017954922230872185
     },
-    "parameters": 499780,
-    "trainable_parameters": 1225,
+    "parameters": 502468,
+    "trainable_parameters": 3913,
     "paths": [
-      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k5_w01_4k_s7\\metrics.json",
-      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k5_w01_4k_s11\\metrics.json",
-      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k5_w01_4k_s23\\metrics.json"
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k9_w01_ext4k_s7\\metrics.json",
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k9_w01_ext4k_s11\\metrics.json",
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k9_w01_ext4k_s23\\metrics.json"
     ]
   },
   "three_seed_accuracy_alternative": {
@@ -101,6 +121,31 @@
       "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h16_w01_4k\\metrics.json",
       "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h16_w01_4k_s11\\metrics.json",
       "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h16_w01_4k_s23\\metrics.json"
+    ]
+  },
+  "three_seed_mid_capacity": {
+    "values": [
+      0.01940632425248623,
+      0.01945878565311432,
+      0.01916017010807991
+    ],
+    "mean": 0.019341760004560154,
+    "std": 0.00015943405381769638,
+    "pde_relative_rms": {
+      "values": [
+        0.35366132855415344,
+        0.35361796617507935,
+        0.34592902660369873
+      ],
+      "mean": 0.3510694404443105,
+      "std": 0.004451781768409652
+    },
+    "parameters": 499780,
+    "trainable_parameters": 1225,
+    "paths": [
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k5_w01_4k_s7\\metrics.json",
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k5_w01_4k_s11\\metrics.json",
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k5_w01_4k_s23\\metrics.json"
     ]
   }
 }

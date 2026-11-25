@@ -25,15 +25,30 @@ def main() -> None:
     parser.add_argument("--seeds", nargs="+", type=int, default=[7, 11, 23])
     parser.add_argument("--steps", type=int, default=4000)
     parser.add_argument("--physics-weight", type=float, default=0.01)
+    parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--refiner-hidden", type=int, default=16)
     parser.add_argument("--refiner-kernel", type=int, default=3)
     parser.add_argument("--tag", default="burgers_h16_w01_4k")
+    parser.add_argument(
+        "--source-mode",
+        choices=("base", "previous"),
+        default="base",
+    )
+    parser.add_argument("--source-tag")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
 
     for seed in args.seeds:
         if seed not in SOURCES:
             raise ValueError(f"unsupported seed: {seed}")
+        if args.source_mode == "base":
+            source = SOURCES[seed]
+        else:
+            if not args.source_tag:
+                raise ValueError("--source-tag is required for previous mode")
+            source = OUTPUT / f"{args.source_tag}_s{seed}" / "model.pt"
+        if not source.exists():
+            raise FileNotFoundError(source)
         output = KNOWN_OUTPUTS.get(
             (args.tag, seed),
             OUTPUT / f"{args.tag}_s{seed}",
@@ -45,7 +60,7 @@ def main() -> None:
             sys.executable,
             str(ROOT / "code" / "finetune_pde_residual.py"),
             "--source-checkpoint",
-            str(SOURCES[seed]),
+            str(source),
             "--output-dir",
             str(output),
             "--steps",
@@ -57,7 +72,7 @@ def main() -> None:
             "--physics-warmup",
             "200",
             "--lr",
-            "0.001",
+            str(args.lr),
             "--physics-refiner",
             "--refiner-hidden",
             str(args.refiner_hidden),
