@@ -286,10 +286,151 @@ def beta7_ablation() -> None:
     plt.close(fig)
 
 
+def residual_seed_consistency() -> None:
+    summary = read_json(OUT / "residual_seed_summary.json")
+    entries = [
+        ("beta=2", summary["beta2"]),
+        ("beta=4", summary["beta4"]),
+        ("beta=7", summary["beta7"]),
+    ]
+    labels = [entry[0] for entry in entries]
+    means = np.array([entry[1]["test_mean"] for entry in entries])
+    stds = np.array([entry[1]["test_std"] for entry in entries])
+    fno = np.array([entry[1]["fno_test_l2"] for entry in entries])
+    x = np.arange(len(entries))
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5.7))
+    for axis in axes:
+        style_axis(axis)
+
+    axes[0].bar(
+        x,
+        means,
+        width=0.58,
+        color=LIGHT,
+        edgecolor=PG,
+        linewidth=1.3,
+        label="Final-stage mean",
+    )
+    seed_offsets = np.array([-0.12, 0.0, 0.12])
+    seed_colors = ["#0b5563", PG, "#54a6ad"]
+    for index, (_, entry) in enumerate(entries):
+        values = np.asarray(entry["test_values"])
+        axes[0].scatter(
+            np.full(values.shape, x[index]) + seed_offsets,
+            values,
+            s=36,
+            color=seed_colors,
+            edgecolor="white",
+            linewidth=0.7,
+            zorder=4,
+        )
+    axes[0].errorbar(
+        x,
+        means,
+        yerr=stds,
+        fmt="D",
+        markersize=6,
+        color=INK,
+        ecolor=INK,
+        capsize=5,
+        linewidth=1.1,
+        zorder=5,
+        label="Mean +/- std",
+    )
+    axes[0].hlines(
+        fno,
+        x - 0.32,
+        x + 0.32,
+        colors=FNO,
+        linestyles="--",
+        linewidth=2,
+        label="Matched FNO",
+    )
+    for index, (mean, std) in enumerate(zip(means, stds)):
+        axes[0].text(
+            index,
+            mean + std + 0.00035,
+            f"{mean:.6f}\n+/- {std:.6f}",
+            ha="center",
+            va="bottom",
+            fontsize=8.5,
+            color=INK,
+            fontweight="bold",
+        )
+    axes[0].set_xticks(x, labels)
+    axes[0].set_ylim(0.0046, 0.0125)
+    axes[0].set_ylabel("Relative Test L2, lower is better")
+    axes[0].set_title("Final residual stage: seed spread")
+    axes[0].legend(frameon=False, loc="upper left", fontsize=8.5)
+
+    relative_gap = (means / fno - 1.0) * 100.0
+    gap_colors = [PG if value < 0 else DEEPONET for value in relative_gap]
+    bars = axes[1].barh(
+        x,
+        relative_gap,
+        height=0.54,
+        color=gap_colors,
+        alpha=0.9,
+    )
+    axes[1].axvline(0, color=INK, linewidth=1.1)
+    for bar, value in zip(bars, relative_gap):
+        offset = 1.2 if value >= 0 else -1.2
+        alignment = "left" if value >= 0 else "right"
+        axes[1].text(
+            value + offset,
+            bar.get_y() + bar.get_height() / 2,
+            f"{value:+.1f}%",
+            va="center",
+            ha=alignment,
+            fontsize=10,
+            color=INK,
+            fontweight="bold",
+        )
+    axes[1].set_yticks(x, labels)
+    axes[1].invert_yaxis()
+    axes[1].set_xlim(-31, 36)
+    axes[1].set_xlabel("Relative difference from matched FNO (negative is better)")
+    axes[1].set_title("Accuracy margin against FNO")
+    axes[1].text(
+        -30,
+        2.43,
+        "PG better",
+        color=PG,
+        fontsize=9,
+        fontweight="bold",
+    )
+    axes[1].text(
+        35,
+        2.43,
+        "FNO better",
+        color=DEEPONET,
+        fontsize=9,
+        fontweight="bold",
+        ha="right",
+    )
+
+    fig.suptitle(
+        "Residual branch three-seed stability\n"
+        "Shared earlier-stage checkpoint; seeds vary the final fine-tuning stage only",
+        fontsize=14,
+        fontweight="bold",
+        linespacing=1.35,
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.91))
+    fig.savefig(
+        OUT / "residual_seed_summary.png",
+        dpi=260,
+        bbox_inches="tight",
+    )
+    plt.close(fig)
+
+
 def main() -> None:
     parameter_sweep()
     residual_budget()
     beta7_ablation()
+    residual_seed_consistency()
 
 
 if __name__ == "__main__":

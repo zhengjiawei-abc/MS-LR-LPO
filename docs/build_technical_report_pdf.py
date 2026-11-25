@@ -69,30 +69,36 @@ FIGURES = {
             "图 4. beta=2 与 beta=4 的残差训练预算和 FNO 阈值。",
         )
     ],
-    "### 5.5 β=7 结构消融": [
+    "### 5.5 残差分支三 seed 稳定性": [
         (
-            ROOT / "analysis_plots_clean" / "beta7_residual_ablation.png",
-            "图 5. beta=7 高频残差分支消融。",
+            ROOT / "analysis_plots_clean" / "residual_seed_summary.png",
+            "图 5. beta=2/4/7 最终残差阶段三 seed 稳定性及相对 FNO 差距。",
         )
     ],
-    "### 5.6 二维扩展结果": [
+    "### 5.6 β=7 结构消融": [
+        (
+            ROOT / "analysis_plots_clean" / "beta7_residual_ablation.png",
+            "图 6. beta=7 高频残差分支消融。",
+        )
+    ],
+    "### 5.7 二维扩展结果": [
         (
             ROOT / "analysis_plots_2d" / "seed_comparison.png",
-            "图 6. 二维 diffusion-reaction 三 seed 三方对比。",
+            "图 7. 二维 diffusion-reaction 三 seed 三方对比。",
         ),
         (
             ROOT / "analysis_plots_2d_ns" / "seed_comparison.png",
-            "图 7. 二维不可压缩 NS 的速度与散度三方对比。",
+            "图 8. 二维不可压缩 NS 的速度与散度三方对比。",
         ),
     ],
-    "### 5.7 一维效率与高监督 DeepONet": [
+    "### 5.8 一维效率与高监督 DeepONet": [
         (
             ROOT / "analysis_plots_clean" / "deeponet_supervision.png",
-            "图 8. Burgers DeepONet 监督点数消融。",
+            "图 9. Burgers DeepONet 监督点数消融。",
         ),
         (
             ROOT / "analysis_plots_clean" / "efficiency_1d_summary.png",
-            "图 9. 一维 PG/FNO/DeepONet 推理效率。",
+            "图 10. 一维 PG/FNO/DeepONet 推理效率。",
         ),
     ],
 }
@@ -452,12 +458,12 @@ def cover_story(styles: dict[str, ParagraphStyle]) -> list:
         Spacer(1, 14 * mm),
     ]
     summary = [
-        ["研究范围", "PDEBench 一维标量方程"],
+        ["研究范围", "PDEBench 一维标量方程与二维扩展"],
         ["主要任务", "Burgers / diffusion-sorption / advection"],
         ["参数网格", "beta = 0.2, 0.7, 1.0, 2.0, 4.0, 7.0"],
         ["标准参数预算", "501,435"],
         ["参数匹配 FNO", "503,165"],
-        ["版本日期", "2026-11-24"],
+        ["版本日期", "2026-11-25"],
     ]
     table = Table(
         [
@@ -526,8 +532,9 @@ def markdown_story(
     page_break_before_h2 = {
         "### 5.3 Advection 参数扫描",
         "### 5.4 残差训练预算",
-        "### 5.5 β=7 结构消融",
-        "### 5.6 二维扩展结果",
+        "### 5.5 残差分支三 seed 稳定性",
+        "### 5.6 β=7 结构消融",
+        "### 5.7 二维扩展结果",
     }
 
     def flush_paragraph() -> None:

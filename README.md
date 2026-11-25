@@ -24,6 +24,9 @@ PDF 版本见
 一维 advection 在 ±20% 参数先验、8 个时间快照和 0–10% 噪声下，β 反演
 100% 落在 5% 误差内，MAPE 为 `0.036%–0.049%`。
 
+β=2、4、7 的最终残差阶段已完成三 seed 稳定性检查。β=2、4 仍优于参数匹配 FNO；
+β=7 三 seed 均值为 `0.011357 ± 0.000008`，仍落后 FNO 的 `0.009003`。
+
 Burgers 高监督 DeepONet 三 seed 为 `0.2532 ± 0.0050`，仍落后 PG
 `0.0198` 与 FNO `0.0246`。1D 推理延迟 PG `22.0 ms`、FNO `1.20 ms`、
 DeepONet `6.07 ms`（batch=32）。
@@ -48,6 +51,8 @@ u0(x) -> context encoder
 ![Residual training budget analysis](analysis_plots_clean/residual_budget_analysis.png)
 
 ![High-speed residual branch ablation](analysis_plots_clean/beta7_residual_ablation.png)
+
+![Residual branch three-seed stability](analysis_plots_clean/residual_seed_summary.png)
 
 ![Base operator ablation study](analysis_plots_clean/ablation_study.png)
 
@@ -138,14 +143,17 @@ DeepONet 每个训练步只随机采样 `256` 个时空点进行监督；PG-MS-L
 - 在 Burgers `Nu=0.01`、diffusion-sorption 和已测六个 advection β 上，
   PG-MS-LR-LPO 在绝大多数设置中优于参数匹配 FNO。
 - 在所有已测设置中，PG-MS-LR-LPO 均优于标准 DeepONet。
-- β=2、4 的可学习残差可以超过 FNO；β=7 的最新高频分支为 `0.011352`，
-  仍落后 FNO 的 `0.009003`，是当前明确失败案例。
+- β=2、4 的可学习残差可以超过 FNO；β=7 的高频分支三 seed 最终阶段均值为
+  `0.011357 ± 0.000008`，仍落后 FNO 的 `0.009003`，是当前明确失败案例。
+- β=2、4、7 的三 seed 只改变最终残差微调阶段，三个 seed 共享早期 checkpoint；
+  该结果证明最终阶段稳定，不等同于三次从零独立训练。
 
 尚不能声称“全面超过官方 PDEBench”：
 
 - Burgers 只使用 `Nu=0.01`，不是全部 12 个粘度文件。
 - Advection 使用了 6 个 β，尚缺官方 `0.1` 和 `0.4`。
-- 1D CFD、2D CFD、Darcy、SWE 和 NS 尚未执行。
+- 1D CFD、2D CFD、Darcy 和 SWE 尚未执行；NS 只覆盖二维力条件速度场子集，
+  尚无完整压力场和全分辨率结果。
 - FNO/DeepONet 是项目内的参数匹配实现，不是 PDEBench 官方榜单结果。
 - DeepONet 仍使用 256 点随机监督，需要补充全监督版本。
 
@@ -180,6 +188,9 @@ PG 对 FNO 的 Welch p 为 `0.00091`，对 DeepONet 为 `0.00399`。
 `beta=2.0` 时，线性平移的离散误差明显增大。固定平移 Test L2 为 `0.008304`，
 反而落后 FNO 的 `0.006300`。将融合系数设为可学习，并从固定平移解继续训练 4K 步后：
 
+本段保留 seed 7 的优化轨迹；下面的六参数汇总改用 FNO/DeepONet 三 seed 均值，
+因此 β=2 的 FNO 数值为 `0.006389`。
+
 | beta=2.0 方法 | 参数 | Test L2 |
 |---|---:|---:|
 | 基础神经模型 | 501,435 | 0.020495 |
@@ -205,22 +216,34 @@ PG 对 FNO 的 Welch p 为 `0.00091`，对 DeepONet 为 `0.00399`。
 beta = 0.2, 0.7, 1.0, 2.0, 4.0, 7.0
 ```
 
-六参数 Test L2（FNO/DeepONet 为三 seed 均值）：
+六参数 Test L2（FNO/DeepONet 为三 seed 均值；可学习残差为最终阶段三 seed）：
 
 | beta | 固定平移 PG | 可学习残差 PG | FNO | DeepONet |
 |---:|---:|---:|---:|---:|
 | 0.2 | **0.001645** | - | 0.005010 | 0.132452 |
 | 0.7 | **0.003762** | - | 0.006435 | 0.326126 |
 | 1.0 | **0.004543** | - | 0.006626 | 0.497047 |
-| 2.0 | 0.008304 | **0.005043** | 0.006389 | 0.623089 |
-| 4.0 | 0.017987 | **0.007183** | 0.007262 | 0.701016 |
-| 7.0 | 0.033748 | 0.011352 | **0.009003** | 0.706937 |
+| 2.0 | 0.008304 | **0.005043 ± 0.000002** | 0.006389 | 0.623089 |
+| 4.0 | 0.017987 | **0.007183 ± 0.000001** | 0.007262 | 0.701016 |
+| 7.0 | 0.033748 | 0.011357 ± 0.000008 | **0.009003** | 0.706937 |
 
 β≤1 时解析平移已经很强；β≥2 后离散插值误差快速增大，必须依靠可学习残差。
 β=2 和 β=4 的独立残差模型已经重新超过 FNO。β=7 的最强变体使用 128 点解码网格、
 30 个 Fourier bands、17 个 rollout anchors 和 hidden-20 局部残差滤波器，从
-`0.014044` 改善到 `0.011352`，提升约 19%，但仍落后 FNO。最终参数为 `503,161`，
+`0.014044` 改善到 `0.011357 ± 0.000008`，提升约 19%，但仍落后 FNO。最终参数为 `503,161`，
 比 FNO 少 4 个。256 点网格在约 500 步时需要 10 分钟，暂不采用。
+
+### 残差分支最终阶段三 seed
+
+三个 seed 使用相同入口 checkpoint，仅最终残差阶段分别使用 seed 7、11、23：
+
+| beta | Seed 7 | Seed 11 | Seed 23 | Mean +- Std | FNO |
+|---:|---:|---:|---:|---:|---:|
+| 2.0 | 0.00504318 | 0.00504162 | 0.00504465 | **0.00504315 +- 0.00000152** | 0.006389 |
+| 4.0 | 0.00718284 | 0.00718236 | 0.00718401 | **0.00718307 +- 0.00000085** | 0.007262 |
+| 7.0 | 0.01135244 | 0.01135171 | 0.01136538 | 0.01135651 +- 0.00000769 | 0.009003 |
+
+β=2 和 β=4 的优势在 seed 间稳定存在；β=7 的失败也没有被 seed 选择掩盖。
 
 对多参数轨迹做无先验 β 扫描时发现：周期离散平移存在速度混叠。在时间步长
 `dt=0.02`、空间网格 `NX=256` 时，相隔 `1/(dt*NX)=0.1953` 的候选速度会产生近似
@@ -441,6 +464,7 @@ python code/baselines_1d_burgers.py \
 | `code/baselines_1d_burgers.py` | 参数匹配 FNO 与 DeepONet |
 | `code/benchmark_1d_models.py` | 1D 参数、延迟、吞吐与显存基准 |
 | `code/run_cross_pde_matrix.py` | Burgers、advection、diffusion-sorption 四模型矩阵 |
+| `code/run_residual_seed_queue.py` | β=2、4、7 最终残差阶段 seed 队列 |
 | `code/evaluate_advection_beta_inference.py` | advection β 多参数反演与离散可辨识性诊断 |
 | `code/burgers_common.py` | 数据读取、split 解析、误差与坐标工具 |
 | `datasets/pdebench_group_to_parquet.py` | 分组和整块 tensor 两种 PDEBench 1D HDF5 转换 |
@@ -459,6 +483,7 @@ python code/baselines_1d_burgers.py \
 
 - Burgers、diffusion-sorption、advection 的模型对比均补齐三 seed；
   advection 物理分支输出确定，因此标准差为 0。
+- β=2、4、7 的可学习残差仅完成最终阶段三 seed；早期 checkpoint 仍共享。
 - 周期平移分支只适用于已知常速、周期边界的线性平流。
 - 高 beta 下定点平移受离散插值误差限制，需要使用可学习残差分支。
 - Diffusion-sorption 使用归一化时间坐标，不能直接复用 Burgers PDE residual。
@@ -485,4 +510,4 @@ python code/baselines_1d_burgers.py \
 zhengjiawei-abc  
 1103493759@qq.com
 
-最后更新：2026-11-24
+最后更新：2026-11-25

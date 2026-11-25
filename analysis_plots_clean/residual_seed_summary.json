@@ -1,0 +1,59 @@
+{
+  "beta2": {
+    "seeds": [
+      7,
+      11,
+      23
+    ],
+    "test_values": [
+      0.0050800032913684845,
+      0.005041616037487984,
+      0.005044649355113506
+    ],
+    "test_mean": 0.005055422894656658,
+    "test_std": 2.134120851398529e-05,
+    "parameters": 501436,
+    "fno_test_l2": 0.006389,
+    "initial_checkpoint": "pg_residual_sweep_stage10/model.pt",
+    "final_stage_steps": 4000,
+    "scope": "final residual stage; shared earlier-stage checkpoint, seeds vary final fine-tuning only"
+  },
+  "beta4": {
+    "seeds": [
+      7,
+      11,
+      23
+    ],
+    "test_values": [
+      0.0071828365325927734,
+      0.0071823629550635815,
+      0.007184007670730352
+    ],
+    "test_mean": 0.007183069052795569,
+    "test_std": 8.466531991680791e-07,
+    "parameters": 501436,
+    "fno_test_l2": 0.007262,
+    "initial_checkpoint": "pg_residual_stage3_16k/model.pt",
+    "final_stage_steps": 2000,
+    "scope": "final residual stage; shared earlier-stage checkpoint, seeds vary final fine-tuning only"
+  },
+  "beta7": {
+    "seeds": [
+      7,
+      11,
+      23
+    ],
+    "test_values": [
+      0.011352443136274815,
+      0.01135171391069889,
+      0.011365379206836224
+    ],
+    "test_mean": 0.01135651208460331,
+    "test_std": 7.687804303260023e-06,
+    "parameters": 503161,
+    "fno_test_l2": 0.009003,
+    "initial_checkpoint": "pg_residual_grid128_xbands30_roll17_refine16_2k/model.pt",
+    "final_stage_steps": 2000,
+    "scope": "final residual stage; shared earlier-stage checkpoint, seeds vary final fine-tuning only"
+  }
+}
