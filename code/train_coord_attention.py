@@ -16,9 +16,19 @@ from pathlib import Path
 
 import torch
 
-from burgers_common import (NT, NX, configure_backend, count_parameters, grid_coordinates,
-                            load_split, relative_l2, resolve_split_path, set_seed)
+from burgers_common import (
+    NT,
+    NX,
+    configure_backend,
+    count_parameters,
+    grid_coordinates,
+    load_split,
+    relative_l2,
+    resolve_split_path,
+    set_seed,
+)
 from coord_attention_operator import CoordAttentionOperator, OperatorConfig
+from pde_residual_1d import normalized_pde_residual
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "datasets" / "pdebench_burgers"
 
@@ -52,6 +62,21 @@ def evaluate(model, fields, device) -> float:
     return relative_l2(predict_full(model, fields, device), fields[..., 0])
 
 
+def evaluate_with_physics(
+    model,
+    fields,
+    device,
+    equation: str,
+    beta: float,
+) -> dict:
+    prediction = predict_full(model, fields, device)
+    residual = normalized_pde_residual(prediction, equation, beta)[1]
+    return {
+        "l2": relative_l2(prediction, fields[..., 0]),
+        "pde_relative_rms": float(residual),
+    }
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--train-samples", type=int, default=512)
@@ -61,6 +86,16 @@ def main() -> None:
     p.add_argument("--loss-mode", choices=("points", "full"), default="points")
     p.add_argument("--grid-chunk", type=int, default=8)
     p.add_argument("--recon-weight", type=float, default=0.0)
+    p.add_argument("--physics-weight", type=float, default=0.0)
+    p.add_argument(
+        "--physics-equation",
+        choices=("burgers", "advection"),
+        default="burgers",
+    )
+    p.add_argument("--physics-beta", type=float, default=1.0)
+    p.add_argument("--physics-start-step", type=int, default=0)
+    p.add_argument("--physics-warmup", type=int, default=2000)
+    p.add_argument("--physics-score-weight", type=float, default=0.0)
     p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--weight-decay", type=float, default=1e-4)
     p.add_argument("--warmup", type=int, default=500)
@@ -210,6 +245,12 @@ def main() -> None:
         raise ValueError("--recon-weight requires latent dynamics")
     if args.recon_weight > 0.0 and model.dynamics.encoder.decode is None:
         raise ValueError("--recon-weight requires --latent-recon true")
+    if args.physics_weight > 0.0 and (
+        args.loss_mode != "full" or model.grid_decoder is None
+    ):
+        raise ValueError(
+            "--physics-weight requires --loss-mode full and grid output"
+        )
     print(f"params {count_parameters(model)}", flush=True)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
@@ -226,17 +267,43 @@ def main() -> None:
     started = time.time()
     for step in range(args.steps):
         idx = torch.randint(0, train.size(0), (args.batch_size,), device=device)
+        data_loss = None
+        pde_loss = None
+        pde_relative = None
+        physics_ramp = 0.0
         opt.zero_grad(set_to_none=True)
         if args.loss_mode == "full":
             fields = train[idx, :, :, 0]
             target = fields
             if model.grid_decoder is not None:
                 prediction = model.forward_grid(fields[:, :, 0])
-                loss = torch.mean((prediction - target) ** 2)
+                data_loss = torch.mean((prediction - target) ** 2)
+                loss = data_loss
                 if args.recon_weight > 0.0:
                     reconstruction = model.reconstruct(fields[:, :, 0])
                     loss = loss + args.recon_weight * torch.mean(
                         (reconstruction - fields[:, :, 0]) ** 2
+                    )
+                pde_loss = None
+                pde_relative = None
+                physics_ramp = 0.0
+                if args.physics_weight > 0.0:
+                    pde_loss, pde_relative = normalized_pde_residual(
+                        prediction,
+                        args.physics_equation,
+                        args.physics_beta,
+                    )
+                    physics_ramp = min(
+                        1.0,
+                        max(
+                            0,
+                            step + 1 - args.physics_start_step,
+                        )
+                        / max(args.physics_warmup, 1),
+                    )
+                    loss = (
+                        loss
+                        + args.physics_weight * physics_ramp * pde_loss
                     )
                 loss.backward()
                 total_points = target.numel()
@@ -260,6 +327,7 @@ def main() -> None:
                         retain_graph=stop < args.batch_size
                     )
                 loss = torch.tensor(loss_value / total_points, device=device)
+                data_loss = loss
         else:
             xi = torch.randint(0, NX, (args.batch_size, args.points), device=device)
             ti = torch.randint(0, NT, (args.batch_size, args.points), device=device)
@@ -267,6 +335,7 @@ def main() -> None:
             target = fields[torch.arange(args.batch_size, device=device)[:, None], xi, ti]
             pred = model(fields[:, :, 0], x_axis[xi, ti].unsqueeze(-1), t_axis[xi, ti].unsqueeze(-1))
             loss = torch.mean((pred - target) ** 2)
+            data_loss = loss
             if args.recon_weight > 0.0:
                 reconstruction = model.reconstruct(fields[:, :, 0])
                 loss = loss + args.recon_weight * torch.mean(
@@ -281,11 +350,57 @@ def main() -> None:
         opt.step()
         sched.step()
         if (step + 1) % args.eval_every == 0 or step + 1 == args.steps:
-            dev_l2 = evaluate(model, dev, device)
-            history.append({"step": step + 1, "loss": loss.item(), "dev_l2": dev_l2})
-            if dev_l2 < best:
-                best, best_step, best_state = dev_l2, step + 1, copy.deepcopy(model.state_dict())
-            print(f"step {step + 1:6d} loss {loss.item():.3e} dev_l2 {dev_l2:.4f} best {best:.4f}@{best_step}", flush=True)
+            if args.physics_weight > 0.0:
+                dev_metrics = evaluate_with_physics(
+                    model,
+                    dev,
+                    device,
+                    args.physics_equation,
+                    args.physics_beta,
+                )
+            else:
+                dev_metrics = {"l2": evaluate(model, dev, device)}
+            dev_l2 = dev_metrics["l2"]
+            dev_pde = dev_metrics.get("pde_relative_rms")
+            selection_score = dev_l2
+            if dev_pde is not None:
+                selection_score += args.physics_score_weight * dev_pde
+            history.append(
+                {
+                    "step": step + 1,
+                    "loss": float(loss.item()),
+                    "data_loss": (
+                        float(data_loss.detach())
+                        if data_loss is not None
+                        else None
+                    ),
+                    "pde_loss": (
+                        float(pde_loss.detach())
+                        if pde_loss is not None
+                        else None
+                    ),
+                    "pde_relative_rms": (
+                        float(pde_relative.detach())
+                        if pde_relative is not None
+                        else None
+                    ),
+                    "physics_ramp": physics_ramp,
+                    "dev_l2": dev_l2,
+                    "dev_pde_relative_rms": dev_pde,
+                    "selection_score": selection_score,
+                }
+            )
+            if selection_score < best:
+                best = selection_score
+                best_step = step + 1
+                best_state = copy.deepcopy(model.state_dict())
+            print(
+                f"step {step + 1:6d} loss {loss.item():.3e} "
+                f"dev_l2 {dev_l2:.4f} "
+                f"dev_pde {(dev_pde if dev_pde is not None else float('nan')):.4f} "
+                f"best {best:.4f}@{best_step}",
+                flush=True,
+            )
             if args.save_every > 0 and (step + 1) % args.save_every == 0:
                 milestone_dir = args.output_dir / "milestones" / f"step_{step + 1:06d}"
                 milestone_dir.mkdir(parents=True, exist_ok=True)
@@ -296,10 +411,24 @@ def main() -> None:
                 milestone = {
                     "step": step + 1,
                     "dev_l2": dev_l2,
+                    "dev_pde_relative_rms": dev_pde,
                     "parameter_count": count_parameters(model),
                 }
                 if args.test_every > 0 and (step + 1) % args.test_every == 0:
-                    milestone["test_l2"] = evaluate(model, test, device)
+                    if args.physics_weight > 0.0:
+                        test_metrics = evaluate_with_physics(
+                            model,
+                            test,
+                            device,
+                            args.physics_equation,
+                            args.physics_beta,
+                        )
+                        milestone["test_l2"] = test_metrics["l2"]
+                        milestone["test_pde_relative_rms"] = test_metrics[
+                            "pde_relative_rms"
+                        ]
+                    else:
+                        milestone["test_l2"] = evaluate(model, test, device)
                     print(
                         f"milestone {step + 1:6d} test_l2 "
                         f"{milestone['test_l2']:.6f}",
@@ -311,10 +440,38 @@ def main() -> None:
                 )
 
     model.load_state_dict(best_state)
-    res = {"train_l2": evaluate(model, train[:256], device), "dev_l2": best,
-           "test_l2": evaluate(model, test, device)}
-    print(f"best@{best_step}: train(256) {res['train_l2']:.4f} dev {res['dev_l2']:.4f} "
-          f"test(all {test.size(0)}) {res['test_l2']:.4f}", flush=True)
+    train_l2 = evaluate(model, train[:256], device)
+    if args.physics_weight > 0.0:
+        final_dev = evaluate_with_physics(
+            model,
+            dev,
+            device,
+            args.physics_equation,
+            args.physics_beta,
+        )
+        final_test = evaluate_with_physics(
+            model,
+            test,
+            device,
+            args.physics_equation,
+            args.physics_beta,
+        )
+    else:
+        final_dev = {"l2": evaluate(model, dev, device)}
+        final_test = {"l2": evaluate(model, test, device)}
+    res = {
+        "train_l2": train_l2,
+        "dev_l2": final_dev["l2"],
+        "test_l2": final_test["l2"],
+        "dev_pde_relative_rms": final_dev.get("pde_relative_rms"),
+        "test_pde_relative_rms": final_test.get("pde_relative_rms"),
+    }
+    print(
+        f"best@{best_step}: train(256) {res['train_l2']:.4f} "
+        f"dev {res['dev_l2']:.4f} "
+        f"test(all {test.size(0)}) {res['test_l2']:.4f}",
+        flush=True,
+    )
     args.output_dir.mkdir(parents=True, exist_ok=True)
     run_cfg = {k: (str(v) if isinstance(v, Path) else v) for k, v in vars(args).items()}
     metadata_path = args.data_dir / "metadata.json"
@@ -336,7 +493,10 @@ def main() -> None:
         },
         "parameter_count": count_parameters(model), "best_step": best_step,
         "train_relative_l2": res["train_l2"], "dev_relative_l2": res["dev_l2"],
-        "test_relative_l2": res["test_l2"], "test_samples": test.size(0),
+        "test_relative_l2": res["test_l2"],
+        "dev_pde_relative_rms": res["dev_pde_relative_rms"],
+        "test_pde_relative_rms": res["test_pde_relative_rms"],
+        "test_samples": test.size(0),
         "training_seconds": time.time() - started, "history": history}, indent=2), encoding="utf-8")
     if args.save_model:
         torch.save({"state_dict": best_state, "operator": asdict(cfg)}, args.output_dir / "model.pt")

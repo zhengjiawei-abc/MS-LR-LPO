@@ -1,0 +1,28 @@
+{
+  "scope": "Burgers, seed 7; main-training residual constraint versus post-hoc refiner",
+  "pg_base": {
+    "test_l2": 0.01975724659860134,
+    "test_pde_relative_rms": 0.4843822121620178,
+    "parameters": 498555
+  },
+  "pg_main_physics": {
+    "test_l2": 0.027681585401296616,
+    "test_pde_relative_rms": 0.4878554344177246,
+    "parameters": 501435,
+    "physics_weight": 0.0001,
+    "physics_start_step": 0,
+    "physics_warmup": 2000,
+    "steps": 12000
+  },
+  "pg_posthoc_refiner_9x9": {
+    "test_l2": 0.019381208345294,
+    "test_pde_relative_rms": 0.28964775800704956,
+    "parameters": 502468
+  },
+  "pino_seed7": {
+    "test_l2": 0.024085848475806415,
+    "test_pde_relative_rms": 0.25296565890312195,
+    "parameters": 502997
+  },
+  "conclusion": "Early full-backbone residual training slows data convergence and does not reduce the finite-difference residual; the post-hoc lightweight refiner remains the selected approach."
+}

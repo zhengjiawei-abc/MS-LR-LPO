@@ -359,6 +359,24 @@ Burgers 上 PINO 更接近观测残差底噪；advection 上 PINO 的残差低�
 “数据精度优先”。9×9 修正器已经把 Burgers 残差差距缩小到约 14.4%，但 PINO
 仍保持最低残差。
 
+### 主训练残差约束
+
+`train_coord_attention.py` 现已支持在 full-grid 主训练损失中加入归一化 PDE
+residual，并支持 `physics-start-step` 和 `physics-warmup` 课程。Burgers seed 7
+从零训练 12K 步、`lambda_phys=1e-4` 的结果为：
+
+| 模型，Burgers seed 7 | Test L2 | PDE residual | 参数量 |
+|---|---:|---:|---:|
+| PG 数据-only | **0.019757** | 0.4844 | 498,555 |
+| PG 主训练加 residual | 0.027682 | 0.4879 | 501,435 |
+| PG 9×9 后处理修正器 | 0.019381 | **0.2896** | 502,468 |
+| PINO | 0.024086 | **0.2530** | 502,997 |
+
+全程主干残差约束拖慢了数据收敛，同时没有降低测试 PDE residual。当前结论是：
+该方向可以作为后续 curriculum 研究入口，但不替换现有的轻量后处理修正器。
+结果明细见
+[main_physics_constraint.json](analysis_plots_clean/main_physics_constraint.json)。
+
 ## 物理残差
 
 Burgers 可选物理残差微调：
@@ -537,7 +555,7 @@ python code/run_pino_seed_queue.py \
 | 路径 | 内容 |
 |---|---|
 | `code/coord_attention_operator.py` | LatentPDE、上下文编码、低秩解码、skip、周期平移与轻量物理修正分支 |
-| `code/train_coord_attention.py` | 训练、checkpoint 加载、evaluate-only 和物理分支配置 |
+| `code/train_coord_attention.py` | 主训练、PDE residual 课程、checkpoint 恢复和物理分支配置 |
 | `code/baselines_1d_burgers.py` | 参数匹配 FNO、PINO 与 DeepONet |
 | `code/benchmark_1d_models.py` | 1D 参数、延迟、吞吐与显存基准 |
 | `code/run_cross_pde_matrix.py` | Burgers、advection、diffusion-sorption 四模型矩阵 |
