@@ -28,6 +28,7 @@ OUT = Path(__file__).resolve().parent
 EXP = ROOT / "experiments"
 PINO = EXP / "pino_formal"
 REFINER = EXP / "pg_physics_refiner"
+DERIVATIVE_REFINER = EXP / "pg_physics_hpo"
 BURGERS = EXP / "outputs_burgers_dataset" / "official_n8000"
 CROSS = EXP / "outputs_cross_pde"
 
@@ -76,8 +77,13 @@ def pg_burgers() -> tuple[dict, dict]:
             OperatorConfig(**checkpoint["operator"])
         ).to(DEVICE).eval()
         model.load_state_dict(checkpoint["state_dict"])
+        predictions = []
         with torch.no_grad():
-            prediction = model.forward_grid(test[:, :, 0, 0])
+            for start in range(0, test.size(0), 64):
+                predictions.append(
+                    model.forward_grid(test[start : start + 64, :, 0, 0])
+                )
+        prediction = torch.cat(predictions, dim=0)
         test_values.append(relative_l2(prediction, test[..., 0]))
         pde_values.append(
             float(normalized_pde_residual(prediction, "burgers", 1.0)[1])
@@ -166,6 +172,17 @@ def pg_refiner_summary() -> dict:
     )
 
 
+def pg_derivative_refiner_summary() -> dict:
+    return refiner_summary(
+        [
+            DERIVATIVE_REFINER
+            / f"refiner_h18_k11_w03_deriv2k5_4k_budget02_s{seed}"
+            / "metrics.json"
+            for seed in (7, 11, 23)
+        ]
+    )
+
+
 def pg_refiner_accuracy_summary() -> dict:
     return refiner_summary(
         [
@@ -211,6 +228,11 @@ def pg_refiner_candidates() -> dict:
         "h18_k11_w01_ext4k": (
             REFINER / "burgers_h18_k11_w01_ext4k_s7" / "metrics.json"
         ),
+        "h18_k11_w03_derivative": (
+            DERIVATIVE_REFINER
+            / "refiner_h18_k11_w03_deriv2k5_4k_budget02_s7"
+            / "metrics.json"
+        ),
     }
     result = {}
     for name, path in paths.items():
@@ -228,13 +250,14 @@ def pg_refiner_candidates() -> dict:
             "best_step": int(metrics["best_step"]),
         }
     return {
-        "selected": "h18_k11_w01_ext4k",
+        "selected": "h18_k11_w03_derivative",
         "promotion_note": (
-            "11x11 three-seed extension improves residual by about 1.7% "
-            "over the 9x9 candidate while retaining data accuracy."
+            "The derivative-aware branch reaches lower test L2 and PDE "
+            "residual than matched PINO across all three seeds."
         ),
         "selection_rule": (
-            "lowest residual under dev L2 <= initial dev L2 * 1.05"
+            "lowest residual at or below the dev L2 budget; the promoted "
+            "candidate uses a 2% refiner-stage budget"
         ),
         "candidates": result,
     }
@@ -326,6 +349,7 @@ def main() -> None:
         "Burgers": {
             "pg": burgers_pg,
             "pg_refiner": pg_refiner_summary(),
+            "pg_derivative_refiner": pg_derivative_refiner_summary(),
             "pg_refiner_accuracy": pg_refiner_accuracy_summary(),
             "pino": pino_summary("burgers", "w0001"),
             "truth_pde_relative_rms": burgers_truth["relative_rms"],
@@ -354,6 +378,23 @@ def main() -> None:
                     equal_var=False,
                 ).pvalue
             )
+        if "pg_derivative_refiner" in summary[task]:
+            summary[task]["welch_p_derivative_refiner_vs_pino"] = float(
+                ttest_ind(
+                    summary[task]["pg_derivative_refiner"]["values"],
+                    pino_values,
+                    equal_var=False,
+                ).pvalue
+            )
+            summary[task]["welch_p_derivative_residual_vs_pino"] = float(
+                ttest_ind(
+                    summary[task]["pg_derivative_refiner"][
+                        "pde_relative_rms"
+                    ]["values"],
+                    summary[task]["pino"]["pde_relative_rms"]["values"],
+                    equal_var=False,
+                ).pvalue
+            )
     (OUT / "pino_comparison.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
@@ -369,6 +410,9 @@ def main() -> None:
     )
     refiner_payload["three_seed_mid_capacity"] = pg_refiner_mid_summary()
     refiner_payload["three_seed_9x9"] = pg_refiner_9x9_summary()
+    refiner_payload["three_seed_derivative_refiner"] = (
+        pg_derivative_refiner_summary()
+    )
     (OUT / "pg_physics_refiner_summary.json").write_text(
         json.dumps(refiner_payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
@@ -401,8 +445,8 @@ def main() -> None:
     pg_data = np.array([summary[task]["pg"]["mean"] for task in tasks])
     refiner_data = np.array(
         [
-            summary[task]["pg_refiner"]["mean"]
-            if "pg_refiner" in summary[task]
+            summary[task]["pg_derivative_refiner"]["mean"]
+            if "pg_derivative_refiner" in summary[task]
             else np.nan
             for task in tasks
         ]
@@ -421,7 +465,7 @@ def main() -> None:
         refiner_data,
         width,
         color=PG_REFINER,
-        label="PG + physics refiner",
+        label="PG + derivative refiner",
     )
     data_pino = axes[0].bar(
         x + 0.5 * width,
@@ -467,8 +511,8 @@ def main() -> None:
     )
     refiner_pde = np.array(
         [
-            summary[task]["pg_refiner"]["pde_relative_rms"]["mean"]
-            if "pg_refiner" in summary[task]
+            summary[task]["pg_derivative_refiner"]["pde_relative_rms"]["mean"]
+            if "pg_derivative_refiner" in summary[task]
             else np.nan
             for task in tasks
         ]
@@ -491,7 +535,7 @@ def main() -> None:
         refiner_pde,
         width,
         color=PG_REFINER,
-        label="PG + physics refiner",
+        label="PG + derivative refiner",
     )
     axes[1].bar(
         x + 0.5 * width,
@@ -540,7 +584,7 @@ def main() -> None:
         ],
         [
             "PG-MS-LR-LPO",
-            "PG + physics refiner",
+            "PG + derivative refiner",
             "PINO",
             "FNO",
             "Observed data",
@@ -554,7 +598,7 @@ def main() -> None:
     fig.suptitle(
         "PG-MS-LR-LPO versus matched PINO\n"
         "PINO: three seeds, same FNO backbone and 24K steps; "
-        "PG advection is deterministic",
+        "PG derivative refiner: three seeds; PG advection is deterministic",
         fontsize=14,
         fontweight="bold",
         linespacing=1.35,

@@ -1,7 +1,7 @@
 {
-  "selected": "h18_k11_w01_ext4k",
-  "promotion_note": "11x11 three-seed extension improves residual by about 1.7% over the 9x9 candidate while retaining data accuracy.",
-  "selection_rule": "lowest residual under dev L2 <= initial dev L2 * 1.05",
+  "selected": "h18_k11_w03_derivative",
+  "promotion_note": "The derivative-aware branch reaches lower test L2 and PDE residual than matched PINO across all three seeds.",
+  "selection_rule": "lowest residual at or below the dev L2 budget; the promoted candidate uses a 2% refiner-stage budget",
   "candidates": {
     "h16_w01_2k": {
       "physics_weight": 0.01,
@@ -91,6 +91,16 @@
       "test_pde_relative_rms": 0.2849162817001343,
       "parameter_count": 502930,
       "trainable_parameters": 4375,
+      "best_step": 4000
+    },
+    "h18_k11_w03_derivative": {
+      "physics_weight": 0.03,
+      "refiner_hidden": 18,
+      "steps": 4000,
+      "test_l2": 0.022950749844312668,
+      "test_pde_relative_rms": 0.24321237206459045,
+      "parameter_count": 502989,
+      "trainable_parameters": 4434,
       "best_step": 4000
     }
   },
@@ -192,6 +202,31 @@
       "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k9_w01_ext4k_s7\\metrics.json",
       "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k9_w01_ext4k_s11\\metrics.json",
       "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k9_w01_ext4k_s23\\metrics.json"
+    ]
+  },
+  "three_seed_derivative_refiner": {
+    "values": [
+      0.022950749844312668,
+      0.022715674713253975,
+      0.022893447428941727
+    ],
+    "mean": 0.022853290662169456,
+    "std": 0.00012257448245359755,
+    "pde_relative_rms": {
+      "values": [
+        0.24321237206459045,
+        0.24616998434066772,
+        0.24449610710144043
+      ],
+      "mean": 0.24462615450223288,
+      "std": 0.0014830886145946894
+    },
+    "parameters": 502989,
+    "trainable_parameters": 4434,
+    "paths": [
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_hpo\\refiner_h18_k11_w03_deriv2k5_4k_budget02_s7\\metrics.json",
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_hpo\\refiner_h18_k11_w03_deriv2k5_4k_budget02_s11\\metrics.json",
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_hpo\\refiner_h18_k11_w03_deriv2k5_4k_budget02_s23\\metrics.json"
     ]
   }
 }

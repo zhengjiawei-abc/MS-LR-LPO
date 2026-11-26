@@ -1,5 +1,5 @@
 {
-  "scope": "Burgers, seed 7; main-training residual constraint versus post-hoc refiner",
+  "scope": "Burgers; main-training residual constraints versus post-hoc refiners",
   "pg_base": {
     "test_l2": 0.01975724659860134,
     "test_pde_relative_rms": 0.4843822121620178,
@@ -41,10 +41,28 @@
     "test_pde_relative_rms": 0.2849162817001343,
     "parameters": 502930
   },
+  "pg_derivative_refiner_three_seed": {
+    "test_l2_values": [
+      0.022950749844312668,
+      0.022715674713253975,
+      0.022893447428941727
+    ],
+    "test_l2_mean": 0.022853290662169456,
+    "test_l2_std": 0.00012257448245359755,
+    "test_pde_relative_rms_values": [
+      0.24321237206459045,
+      0.24616998434066772,
+      0.24449610710144043
+    ],
+    "test_pde_relative_rms_mean": 0.24462615450223288,
+    "test_pde_relative_rms_std": 0.0014830886145946894,
+    "parameters": 502989,
+    "trainable_parameters": 4434
+  },
   "pino_seed7": {
     "test_l2": 0.024085848475806415,
     "test_pde_relative_rms": 0.25296565890312195,
     "parameters": 502997
   },
-  "conclusion": "Early full-backbone residual training slows data convergence. Late residual training from converged data-only checkpoints improves both data and residual modestly, but the post-hoc lightweight refiner remains far stronger on residual accuracy."
+  "conclusion": "Early full-backbone residual training slows data convergence. Late residual training from converged data-only checkpoints improves both data and residual modestly. The post-hoc derivative-aware refiner is strongest: across three seeds it is below matched PINO on both test L2 and normalized PDE residual."
 }

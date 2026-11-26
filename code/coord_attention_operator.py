@@ -18,6 +18,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from burgers_common import NT, NX, T_FINAL, X_LENGTH
+from pde_residual_1d import normalized_pde_feature_channels
 
 
 @dataclass
@@ -56,6 +57,9 @@ class OperatorConfig:
     grid_physics_refiner: bool = False
     grid_physics_refiner_hidden: int = 0
     grid_physics_refiner_kernel: int = 3
+    grid_physics_refiner_derivatives: bool = False
+    grid_physics_refiner_derivative_hidden: int = 2
+    grid_physics_refiner_derivative_kernel: int = 5
 
 
 class CoordinateEmbedding(nn.Module):
@@ -526,6 +530,30 @@ class CoordAttentionOperator(nn.Module):
         if self.grid_physics_refiner is not None:
             nn.init.zeros_(self.grid_physics_refiner[-1].weight)
             nn.init.zeros_(self.grid_physics_refiner[-1].bias)
+        self.grid_physics_derivative_refiner = (
+            nn.Sequential(
+                nn.Conv2d(
+                    3,
+                    cfg.grid_physics_refiner_derivative_hidden,
+                    1,
+                ),
+                nn.SiLU(),
+                nn.Conv2d(
+                    cfg.grid_physics_refiner_derivative_hidden,
+                    1,
+                    cfg.grid_physics_refiner_derivative_kernel,
+                    padding=cfg.grid_physics_refiner_derivative_kernel // 2,
+                ),
+            )
+            if cfg.grid_physics_refiner_derivatives
+            and cfg.grid_physics_refiner_derivative_hidden > 0
+            else None
+        )
+        if self.grid_physics_derivative_refiner is not None:
+            nn.init.zeros_(
+                self.grid_physics_derivative_refiner[-1].weight
+            )
+            nn.init.zeros_(self.grid_physics_derivative_refiner[-1].bias)
         self.blocks = (
             None
             if grid_mode
@@ -623,9 +651,18 @@ class CoordAttentionOperator(nn.Module):
         context, trajectory, skip_features = self.encode_with_skips(u0)
         field = self.grid_decoder(trajectory, context, skip_features)
         if self.grid_physics_refiner is not None:
-            field = field + self.grid_physics_refiner(
+            correction = self.grid_physics_refiner(
                 field.unsqueeze(1)
             ).squeeze(1)
+            if self.grid_physics_derivative_refiner is not None:
+                correction = correction + self.grid_physics_derivative_refiner(
+                    normalized_pde_feature_channels(
+                        field,
+                        "burgers",
+                        1.0,
+                    )
+                ).squeeze(1)
+            field = field + correction
         velocity = self.cfg.grid_transport_velocity
         if velocity == 0.0:
             return field

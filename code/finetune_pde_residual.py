@@ -55,6 +55,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--physics-refiner", action="store_true")
     parser.add_argument("--refiner-hidden", type=int, default=16)
     parser.add_argument("--refiner-kernel", type=int, default=3)
+    parser.add_argument("--refiner-derivatives", action="store_true")
+    parser.add_argument("--refiner-derivative-hidden", type=int, default=2)
+    parser.add_argument("--refiner-derivative-kernel", type=int, default=5)
     parser.add_argument("--freeze-backbone", action="store_true")
     return parser.parse_args()
 
@@ -106,6 +109,13 @@ def main() -> None:
     operator["grid_physics_refiner"] = args.physics_refiner
     operator["grid_physics_refiner_hidden"] = args.refiner_hidden
     operator["grid_physics_refiner_kernel"] = args.refiner_kernel
+    operator["grid_physics_refiner_derivatives"] = args.refiner_derivatives
+    operator["grid_physics_refiner_derivative_hidden"] = (
+        args.refiner_derivative_hidden
+    )
+    operator["grid_physics_refiner_derivative_kernel"] = (
+        args.refiner_derivative_kernel
+    )
     cfg = OperatorConfig(**operator)
     model = CoordAttentionOperator(cfg).to(device)
     model.load_state_dict(checkpoint["state_dict"], strict=False)
@@ -116,6 +126,9 @@ def main() -> None:
             raise ValueError("--freeze-backbone requires --physics-refiner")
         for parameter in model.grid_physics_refiner.parameters():
             parameter.requires_grad = True
+        if model.grid_physics_derivative_refiner is not None:
+            for parameter in model.grid_physics_derivative_refiner.parameters():
+                parameter.requires_grad = True
 
     train = load_split(
         args.data_dir / f"{args.dataset_prefix}_train_000.parquet",
@@ -276,6 +289,9 @@ def main() -> None:
             "physics_refiner": args.physics_refiner,
             "refiner_hidden": args.refiner_hidden,
             "refiner_kernel": args.refiner_kernel,
+            "refiner_derivatives": args.refiner_derivatives,
+            "refiner_derivative_hidden": args.refiner_derivative_hidden,
+            "refiner_derivative_kernel": args.refiner_derivative_kernel,
             "freeze_backbone": args.freeze_backbone,
         },
         "training_seconds": time.time() - started,

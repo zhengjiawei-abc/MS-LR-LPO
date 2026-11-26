@@ -139,7 +139,7 @@ def architecture_diagram():
     axis.text(
         0.55,
         6.66,
-        "Neural latent PDE plus an optional periodic constant-velocity transport prior",
+        "Neural latent PDE, periodic transport prior, and derivative-aware PDE refiner",
         fontsize=10.5,
         color=MUTED,
     )
@@ -149,7 +149,16 @@ def architecture_diagram():
     box(2.45, 2.1, 2.45, 1.45, "Manifold encoder", "96 channels x 64 latent points", "#e7f0f2")
     box(5.55, 2.1, 2.35, 1.45, "LatentPDE", "9 time anchors\nspectral evolution + nonlinearity", "#fff1dc")
     box(8.55, 2.1, 2.5, 1.45, "Low-rank grid decoder", "3 SVD blocks, rank 17\n+ Fourier x/t features", "#e9f4ea")
-    box(11.65, 2.1, 2.15, 1.45, "u(x,t)", "physics-guided fusion\n256 x 101 field", LIGHT, GRID)
+    box(
+        11.65,
+        2.1,
+        2.15,
+        1.45,
+        "u(x,t)",
+        "physics fusion + PDE refiner\nr / ux / uxx branch",
+        LIGHT,
+        GRID,
+    )
     box(8.55, 5.2, 2.5, 1.0, "Multi-scale skips", "256 / 128 / 64 features\ntime-gated fusion", "#f8e9ed")
     box(11.65, 4.75, 2.15, 1.0, "Periodic transport", "shift u0 by beta t\nmod 1, periodic boundary", "#f8e9ed")
 
@@ -162,12 +171,26 @@ def architecture_diagram():
     arrow((8.55, 5.7), (9.8, 3.55), color=ACCENT, dashed=True)
     arrow((12.7, 4.75), (12.7, 3.55), color=ACCENT, dashed=True)
 
-    axis.text(6.8, 1.35, "Parameters: 501,435", fontsize=11, color=MODEL, fontweight="bold")
-    axis.text(6.8, 1.02, "Matched FNO: 502,997", fontsize=10, color=FNO, fontweight="bold")
+    axis.text(
+        6.8,
+        1.35,
+        "Burgers dual-objective model: 502,989 parameters",
+        fontsize=11,
+        color=MODEL,
+        fontweight="bold",
+    )
+    axis.text(
+        6.8,
+        1.02,
+        "Matched PINO: 502,997",
+        fontsize=10,
+        color=FNO,
+        fontweight="bold",
+    )
     axis.text(
         6.8,
         0.55,
-        "Test L2: Burgers 0.01976 | diffusion-sorption 0.00331 | advection 0.00454",
+        "Burgers test L2: 0.02285 | normalized PDE residual: 0.24463",
         fontsize=11,
         color=INK,
     )
