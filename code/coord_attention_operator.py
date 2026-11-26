@@ -60,6 +60,11 @@ class OperatorConfig:
     grid_physics_refiner_derivatives: bool = False
     grid_physics_refiner_derivative_hidden: int = 2
     grid_physics_refiner_derivative_kernel: int = 5
+    grid_physics_equation: str = "burgers"
+    grid_physics_beta: float = 1.0
+    grid_output_physics_refiner: bool = False
+    grid_output_physics_refiner_hidden: int = 0
+    grid_output_physics_refiner_kernel: int = 5
 
 
 class CoordinateEmbedding(nn.Module):
@@ -554,6 +559,30 @@ class CoordAttentionOperator(nn.Module):
                 self.grid_physics_derivative_refiner[-1].weight
             )
             nn.init.zeros_(self.grid_physics_derivative_refiner[-1].bias)
+        self.grid_output_physics_refiner = (
+            nn.Sequential(
+                nn.Conv2d(
+                    3,
+                    cfg.grid_output_physics_refiner_hidden,
+                    1,
+                ),
+                nn.SiLU(),
+                nn.Conv2d(
+                    cfg.grid_output_physics_refiner_hidden,
+                    1,
+                    cfg.grid_output_physics_refiner_kernel,
+                    padding=cfg.grid_output_physics_refiner_kernel // 2,
+                ),
+            )
+            if cfg.grid_output_physics_refiner
+            and cfg.grid_output_physics_refiner_hidden > 0
+            else None
+        )
+        if self.grid_output_physics_refiner is not None:
+            nn.init.zeros_(
+                self.grid_output_physics_refiner[-1].weight
+            )
+            nn.init.zeros_(self.grid_output_physics_refiner[-1].bias)
         self.blocks = (
             None
             if grid_mode
@@ -658,14 +687,14 @@ class CoordAttentionOperator(nn.Module):
                 correction = correction + self.grid_physics_derivative_refiner(
                     normalized_pde_feature_channels(
                         field,
-                        "burgers",
-                        1.0,
+                        self.cfg.grid_physics_equation,
+                        self.cfg.grid_physics_beta,
                     )
                 ).squeeze(1)
             field = field + correction
         velocity = self.cfg.grid_transport_velocity
         if velocity == 0.0:
-            return field
+            return self._apply_output_physics_refiner(field)
         source = u0.unsqueeze(-1).expand(-1, -1, NT)
         index0 = self.transport_x0.unsqueeze(0).expand(u0.size(0), -1, -1)
         index1 = self.transport_x1.unsqueeze(0).expand(u0.size(0), -1, -1)
@@ -682,7 +711,24 @@ class CoordAttentionOperator(nn.Module):
             residual = residual + self.transport_refiner(
                 residual.unsqueeze(1)
             ).squeeze(1)
-        return transport + blend * residual
+        return self._apply_output_physics_refiner(
+            transport + blend * residual
+        )
+
+    def _apply_output_physics_refiner(
+        self,
+        field: torch.Tensor,
+    ) -> torch.Tensor:
+        if self.grid_output_physics_refiner is None:
+            return field
+        features = normalized_pde_feature_channels(
+            field,
+            self.cfg.grid_physics_equation,
+            self.cfg.grid_physics_beta,
+        )
+        return field + self.grid_output_physics_refiner(
+            features
+        ).squeeze(1)
 
     def reconstruct(self, u0: torch.Tensor) -> torch.Tensor:
         if self.dynamics is None:

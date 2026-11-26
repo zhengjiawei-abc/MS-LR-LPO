@@ -29,6 +29,7 @@ EXP = ROOT / "experiments"
 PINO = EXP / "pino_formal"
 REFINER = EXP / "pg_physics_refiner"
 DERIVATIVE_REFINER = EXP / "pg_physics_hpo"
+ADVECTION_REFINER = EXP / "pg_advection_output_refiner"
 BURGERS = EXP / "outputs_burgers_dataset" / "official_n8000"
 CROSS = EXP / "outputs_cross_pde"
 
@@ -127,6 +128,15 @@ def pg_advection() -> tuple[dict, dict]:
                 normalized_pde_residual(prediction, "advection", 1.0)[1]
             )
         },
+    )
+
+
+def advection_output_refiner_summary() -> dict:
+    return refiner_summary(
+        [
+            ADVECTION_REFINER / f"w0008_budget30_s{seed}_4k" / "metrics.json"
+            for seed in (7, 11, 23)
+        ]
     )
 
 
@@ -357,6 +367,7 @@ def main() -> None:
         },
         "Advection beta=1": {
             "pg": advection_pg,
+            "pg_output_refiner": advection_output_refiner_summary(),
             "pino": pino_summary("advection_beta1", "w0005"),
             "truth_pde_relative_rms": advection_truth["relative_rms"],
             "fno_test_mean": read_json(
@@ -395,6 +406,23 @@ def main() -> None:
                     equal_var=False,
                 ).pvalue
             )
+        if "pg_output_refiner" in summary[task]:
+            summary[task]["welch_p_output_refiner_vs_pino"] = float(
+                ttest_ind(
+                    summary[task]["pg_output_refiner"]["values"],
+                    pino_values,
+                    equal_var=False,
+                ).pvalue
+            )
+            summary[task]["welch_p_output_residual_vs_pino"] = float(
+                ttest_ind(
+                    summary[task]["pg_output_refiner"][
+                        "pde_relative_rms"
+                    ]["values"],
+                    summary[task]["pino"]["pde_relative_rms"]["values"],
+                    equal_var=False,
+                ).pvalue
+            )
     (OUT / "pino_comparison.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
@@ -412,6 +440,9 @@ def main() -> None:
     refiner_payload["three_seed_9x9"] = pg_refiner_9x9_summary()
     refiner_payload["three_seed_derivative_refiner"] = (
         pg_derivative_refiner_summary()
+    )
+    refiner_payload["advection_output_refiner"] = (
+        advection_output_refiner_summary()
     )
     (OUT / "pg_physics_refiner_summary.json").write_text(
         json.dumps(refiner_payload, ensure_ascii=False, indent=2) + "\n",
@@ -445,8 +476,15 @@ def main() -> None:
     pg_data = np.array([summary[task]["pg"]["mean"] for task in tasks])
     refiner_data = np.array(
         [
-            summary[task]["pg_derivative_refiner"]["mean"]
-            if "pg_derivative_refiner" in summary[task]
+            (
+                summary[task]["pg_derivative_refiner"]["mean"]
+                if "pg_derivative_refiner" in summary[task]
+                else summary[task]["pg_output_refiner"]["mean"]
+            )
+            if (
+                "pg_derivative_refiner" in summary[task]
+                or "pg_output_refiner" in summary[task]
+            )
             else np.nan
             for task in tasks
         ]
@@ -465,7 +503,7 @@ def main() -> None:
         refiner_data,
         width,
         color=PG_REFINER,
-        label="PG + derivative refiner",
+        label="PG + learned PDE refiner",
     )
     data_pino = axes[0].bar(
         x + 0.5 * width,
@@ -511,8 +549,19 @@ def main() -> None:
     )
     refiner_pde = np.array(
         [
-            summary[task]["pg_derivative_refiner"]["pde_relative_rms"]["mean"]
-            if "pg_derivative_refiner" in summary[task]
+            (
+                summary[task]["pg_derivative_refiner"][
+                    "pde_relative_rms"
+                ]["mean"]
+                if "pg_derivative_refiner" in summary[task]
+                else summary[task]["pg_output_refiner"][
+                    "pde_relative_rms"
+                ]["mean"]
+            )
+            if (
+                "pg_derivative_refiner" in summary[task]
+                or "pg_output_refiner" in summary[task]
+            )
             else np.nan
             for task in tasks
         ]
@@ -535,7 +584,7 @@ def main() -> None:
         refiner_pde,
         width,
         color=PG_REFINER,
-        label="PG + derivative refiner",
+        label="PG + learned PDE refiner",
     )
     axes[1].bar(
         x + 0.5 * width,
@@ -584,7 +633,7 @@ def main() -> None:
         ],
         [
             "PG-MS-LR-LPO",
-            "PG + derivative refiner",
+            "PG + learned PDE refiner",
             "PINO",
             "FNO",
             "Observed data",
@@ -598,7 +647,7 @@ def main() -> None:
     fig.suptitle(
         "PG-MS-LR-LPO versus matched PINO\n"
         "PINO: three seeds, same FNO backbone and 24K steps; "
-        "PG derivative refiner: three seeds; PG advection is deterministic",
+        "PG learned refiner: three seeds",
         fontsize=14,
         fontweight="bold",
         linespacing=1.35,

@@ -174,7 +174,7 @@ def architecture_diagram():
     axis.text(
         6.8,
         1.35,
-        "Burgers dual-objective model: 502,989 parameters",
+        "Learned PDE refiner: Burgers 502,989 | Advection 501,668",
         fontsize=11,
         color=MODEL,
         fontweight="bold",
@@ -182,7 +182,7 @@ def architecture_diagram():
     axis.text(
         6.8,
         1.02,
-        "Matched PINO: 502,997",
+        "Matched PINO: Burgers 502,997 | Advection 503,165",
         fontsize=10,
         color=FNO,
         fontweight="bold",
@@ -190,7 +190,7 @@ def architecture_diagram():
     axis.text(
         6.8,
         0.55,
-        "Burgers test L2: 0.02285 | normalized PDE residual: 0.24463",
+        "Burgers L2/residual: 0.02285 / 0.24463 | Advection: 0.00579 / 0.10240",
         fontsize=11,
         color=INK,
     )

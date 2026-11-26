@@ -228,5 +228,30 @@
       "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_hpo\\refiner_h18_k11_w03_deriv2k5_4k_budget02_s11\\metrics.json",
       "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_hpo\\refiner_h18_k11_w03_deriv2k5_4k_budget02_s23\\metrics.json"
     ]
+  },
+  "advection_output_refiner": {
+    "values": [
+      0.0057766251266002655,
+      0.00568531034514308,
+      0.005905180238187313
+    ],
+    "mean": 0.005789038569976886,
+    "std": 0.00011045932576821693,
+    "pde_relative_rms": {
+      "values": [
+        0.1023351326584816,
+        0.10211408883333206,
+        0.10275857895612717
+      ],
+      "mean": 0.10240260014931361,
+      "std": 0.0003274992768457481
+    },
+    "parameters": 501668,
+    "trainable_parameters": 233,
+    "paths": [
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_advection_output_refiner\\w0008_budget30_s7_4k\\metrics.json",
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_advection_output_refiner\\w0008_budget30_s11_4k\\metrics.json",
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_advection_output_refiner\\w0008_budget30_s23_4k\\metrics.json"
+    ]
   }
 }

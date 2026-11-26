@@ -130,6 +130,31 @@
       "parameters": 501435,
       "branch_parameters": 0
     },
+    "pg_output_refiner": {
+      "values": [
+        0.0057766251266002655,
+        0.00568531034514308,
+        0.005905180238187313
+      ],
+      "mean": 0.005789038569976886,
+      "std": 0.00011045932576821693,
+      "pde_relative_rms": {
+        "values": [
+          0.1023351326584816,
+          0.10211408883333206,
+          0.10275857895612717
+        ],
+        "mean": 0.10240260014931361,
+        "std": 0.0003274992768457481
+      },
+      "parameters": 501668,
+      "trainable_parameters": 233,
+      "paths": [
+        "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_advection_output_refiner\\w0008_budget30_s7_4k\\metrics.json",
+        "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_advection_output_refiner\\w0008_budget30_s11_4k\\metrics.json",
+        "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_advection_output_refiner\\w0008_budget30_s23_4k\\metrics.json"
+      ]
+    },
     "pino": {
       "values": [
         0.006541566952364519,
@@ -151,6 +176,8 @@
     },
     "truth_pde_relative_rms": 0.1263720840215683,
     "fno_test_mean": 0.006625533734525864,
-    "welch_p_vs_pg": 0.00035501829766882944
+    "welch_p_vs_pg": 0.00035501829766882944,
+    "welch_p_output_refiner_vs_pino": 0.0009766574095087504,
+    "welch_p_output_residual_vs_pino": 0.003039775659101515
   }
 }

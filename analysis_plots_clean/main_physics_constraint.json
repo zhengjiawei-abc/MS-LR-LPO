@@ -59,10 +59,28 @@
     "parameters": 502989,
     "trainable_parameters": 4434
   },
+  "pg_advection_output_refiner_three_seed": {
+    "test_l2_values": [
+      0.0057766251266002655,
+      0.00568531034514308,
+      0.005905180238187313
+    ],
+    "test_l2_mean": 0.005789038569976886,
+    "test_l2_std": 0.00011045932576821693,
+    "test_pde_relative_rms_values": [
+      0.1023351326584816,
+      0.10211408883333206,
+      0.10275857895612717
+    ],
+    "test_pde_relative_rms_mean": 0.10240260014931361,
+    "test_pde_relative_rms_std": 0.0003274992768457481,
+    "parameters": 501668,
+    "trainable_parameters": 233
+  },
   "pino_seed7": {
     "test_l2": 0.024085848475806415,
     "test_pde_relative_rms": 0.25296565890312195,
     "parameters": 502997
   },
-  "conclusion": "Early full-backbone residual training slows data convergence. Late residual training from converged data-only checkpoints improves both data and residual modestly. The post-hoc derivative-aware refiner is strongest: across three seeds it is below matched PINO on both test L2 and normalized PDE residual."
+  "conclusion": "Early full-backbone residual training slows data convergence. Late residual training from converged data-only checkpoints improves both data and residual modestly. Post-hoc learned PDE refiners are strongest: across three seeds, both the Burgers derivative-aware refiner and the advection output refiner are below matched PINO on test L2 and normalized PDE residual."
 }

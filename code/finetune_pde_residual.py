@@ -58,6 +58,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--refiner-derivatives", action="store_true")
     parser.add_argument("--refiner-derivative-hidden", type=int, default=2)
     parser.add_argument("--refiner-derivative-kernel", type=int, default=5)
+    parser.add_argument("--output-refiner", action="store_true")
+    parser.add_argument("--output-refiner-hidden", type=int, default=8)
+    parser.add_argument("--output-refiner-kernel", type=int, default=5)
+    parser.add_argument(
+        "--refiner-equation",
+        choices=("burgers", "advection"),
+        default="burgers",
+    )
+    parser.add_argument("--refiner-beta", type=float, default=1.0)
     parser.add_argument("--freeze-backbone", action="store_true")
     return parser.parse_args()
 
@@ -105,7 +114,12 @@ def main() -> None:
         map_location=device,
         weights_only=False,
     )
-    operator = dict(checkpoint["operator"])
+    supported_operator_keys = set(OperatorConfig.__dataclass_fields__)
+    operator = {
+        key: value
+        for key, value in checkpoint["operator"].items()
+        if key in supported_operator_keys
+    }
     operator["grid_physics_refiner"] = args.physics_refiner
     operator["grid_physics_refiner_hidden"] = args.refiner_hidden
     operator["grid_physics_refiner_kernel"] = args.refiner_kernel
@@ -116,24 +130,42 @@ def main() -> None:
     operator["grid_physics_refiner_derivative_kernel"] = (
         args.refiner_derivative_kernel
     )
+    operator["grid_physics_equation"] = args.refiner_equation
+    operator["grid_physics_beta"] = args.refiner_beta
+    operator["grid_output_physics_refiner"] = args.output_refiner
+    operator["grid_output_physics_refiner_hidden"] = (
+        args.output_refiner_hidden
+    )
+    operator["grid_output_physics_refiner_kernel"] = args.output_refiner_kernel
     cfg = OperatorConfig(**operator)
     model = CoordAttentionOperator(cfg).to(device)
     model.load_state_dict(checkpoint["state_dict"], strict=False)
     if args.freeze_backbone:
         for parameter in model.parameters():
             parameter.requires_grad = False
-        if model.grid_physics_refiner is None:
-            raise ValueError("--freeze-backbone requires --physics-refiner")
-        for parameter in model.grid_physics_refiner.parameters():
-            parameter.requires_grad = True
+        if (
+            model.grid_physics_refiner is None
+            and model.grid_output_physics_refiner is None
+        ):
+            raise ValueError(
+                "--freeze-backbone requires a physics or output refiner"
+            )
+        if model.grid_physics_refiner is not None:
+            for parameter in model.grid_physics_refiner.parameters():
+                parameter.requires_grad = True
         if model.grid_physics_derivative_refiner is not None:
             for parameter in model.grid_physics_derivative_refiner.parameters():
                 parameter.requires_grad = True
+        if model.grid_output_physics_refiner is not None:
+            for parameter in model.grid_output_physics_refiner.parameters():
+                parameter.requires_grad = True
 
-    train = load_split(
-        args.data_dir / f"{args.dataset_prefix}_train_000.parquet",
-        8000,
-    ).to(device)
+    train_path = (
+        args.data_dir / f"{args.dataset_prefix}_train_000.parquet"
+    )
+    if not train_path.exists():
+        train_path = args.data_dir / f"{args.dataset_prefix}_train.parquet"
+    train = load_split(train_path, 8000).to(device)
     dev = load_split(
         args.data_dir / f"{args.dataset_prefix}_dev.parquet",
         1000,
@@ -292,6 +324,11 @@ def main() -> None:
             "refiner_derivatives": args.refiner_derivatives,
             "refiner_derivative_hidden": args.refiner_derivative_hidden,
             "refiner_derivative_kernel": args.refiner_derivative_kernel,
+            "output_refiner": args.output_refiner,
+            "output_refiner_hidden": args.output_refiner_hidden,
+            "output_refiner_kernel": args.output_refiner_kernel,
+            "refiner_equation": args.refiner_equation,
+            "refiner_beta": args.refiner_beta,
             "freeze_backbone": args.freeze_backbone,
         },
         "training_seconds": time.time() - started,
