@@ -348,6 +348,8 @@ PINO 使用与 FNO 完全相同的参数匹配主干、数据划分、24K 训练
 基础 PG 对 PINO 的 Welch 检验为 `p=0.0025`；3×3、5×5、9×9 修正器对 PINO
 分别为 `p=0.00156`、`p=0.00058`、`p=0.00164`。候选和明细见
 [pg_physics_refiner_summary.json](analysis_plots_clean/pg_physics_refiner_summary.json)。
+额外测试的 11×11 seed-7 版本只比 9×9 降低约 `1.6%` 残差，但数据误差变差，
+因此没有继续补三 seed，也没有替换主版本。
 
 Advection β=1 的 PG 数据误差为 `0.004543`，PINO 为 `0.006619`；PG 残差
 `0.1264` 等于观测离散底噪，PINO 的低残差 `0.1045` 来自更平滑但函数误差更大的解。

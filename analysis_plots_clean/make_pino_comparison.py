@@ -196,6 +196,12 @@ def pg_refiner_candidates() -> dict:
         "h24_k9_w01_ext4k": (
             REFINER / "burgers_h24_k9_w01_ext4k_s7" / "metrics.json"
         ),
+        "h18_k11_w01_4k": (
+            EXP / "pg_physics_hpo" / "refiner_h18_k11_w01_4k" / "metrics.json"
+        ),
+        "h18_k11_w01_ext4k": (
+            REFINER / "burgers_h18_k11_w01_ext4k_s7" / "metrics.json"
+        ),
     }
     result = {}
     for name, path in paths.items():
@@ -214,6 +220,11 @@ def pg_refiner_candidates() -> dict:
         }
     return {
         "selected": "h24_k9_w01_ext4k",
+        "exploratory_not_promoted": "h18_k11_w01_ext4k",
+        "promotion_note": (
+            "11x11 seed-7 extension improved residual by only 1.6% over "
+            "the 9x9 three-seed candidate and was not promoted."
+        ),
         "selection_rule": (
             "lowest residual under dev L2 <= initial dev L2 * 1.05"
         ),
