@@ -160,7 +160,7 @@ def refiner_summary(paths: list[Path]) -> dict:
 def pg_refiner_summary() -> dict:
     return refiner_summary(
         [
-            REFINER / f"burgers_h24_k9_w01_ext4k_s{seed}" / "metrics.json"
+            REFINER / f"burgers_h18_k11_w01_ext4k_s{seed}" / "metrics.json"
             for seed in (7, 11, 23)
         ]
     )
@@ -180,6 +180,15 @@ def pg_refiner_mid_summary() -> dict:
     return refiner_summary(
         [
             REFINER / f"burgers_h24_k5_w01_4k_s{seed}" / "metrics.json"
+            for seed in (7, 11, 23)
+        ]
+    )
+
+
+def pg_refiner_9x9_summary() -> dict:
+    return refiner_summary(
+        [
+            REFINER / f"burgers_h24_k9_w01_ext4k_s{seed}" / "metrics.json"
             for seed in (7, 11, 23)
         ]
     )
@@ -219,11 +228,10 @@ def pg_refiner_candidates() -> dict:
             "best_step": int(metrics["best_step"]),
         }
     return {
-        "selected": "h24_k9_w01_ext4k",
-        "exploratory_not_promoted": "h18_k11_w01_ext4k",
+        "selected": "h18_k11_w01_ext4k",
         "promotion_note": (
-            "11x11 seed-7 extension improved residual by only 1.6% over "
-            "the 9x9 three-seed candidate and was not promoted."
+            "11x11 three-seed extension improves residual by about 1.7% "
+            "over the 9x9 candidate while retaining data accuracy."
         ),
         "selection_rule": (
             "lowest residual under dev L2 <= initial dev L2 * 1.05"
@@ -360,6 +368,7 @@ def main() -> None:
         pg_refiner_accuracy_summary()
     )
     refiner_payload["three_seed_mid_capacity"] = pg_refiner_mid_summary()
+    refiner_payload["three_seed_9x9"] = pg_refiner_9x9_summary()
     (OUT / "pg_physics_refiner_summary.json").write_text(
         json.dumps(refiner_payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",

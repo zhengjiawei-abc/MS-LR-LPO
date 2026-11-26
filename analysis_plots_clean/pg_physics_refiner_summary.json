@@ -1,7 +1,6 @@
 {
-  "selected": "h24_k9_w01_ext4k",
-  "exploratory_not_promoted": "h18_k11_w01_ext4k",
-  "promotion_note": "11x11 seed-7 extension improved residual by only 1.6% over the 9x9 three-seed candidate and was not promoted.",
+  "selected": "h18_k11_w01_ext4k",
+  "promotion_note": "11x11 three-seed extension improves residual by about 1.7% over the 9x9 candidate while retaining data accuracy.",
   "selection_rule": "lowest residual under dev L2 <= initial dev L2 * 1.05",
   "candidates": {
     "h16_w01_2k": {
@@ -97,27 +96,27 @@
   },
   "three_seed_residual_selected": {
     "values": [
-      0.019381208345294,
-      0.01952911540865898,
-      0.01946086995303631
+      0.019639138132333755,
+      0.019470417872071266,
+      0.019552191719412804
     ],
-    "mean": 0.01945706456899643,
-    "std": 7.402692455506624e-05,
+    "mean": 0.019553915907939274,
+    "std": 8.437334398562525e-05,
     "pde_relative_rms": {
       "values": [
-        0.28964775800704956,
-        0.2917223870754242,
-        0.2881467044353485
+        0.2849162817001343,
+        0.2868279218673706,
+        0.28262269496917725
       ],
-      "mean": 0.2898389498392741,
-      "std": 0.0017954922230872185
+      "mean": 0.28478896617889404,
+      "std": 0.0021055023742052015
     },
-    "parameters": 502468,
-    "trainable_parameters": 3913,
+    "parameters": 502930,
+    "trainable_parameters": 4375,
     "paths": [
-      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k9_w01_ext4k_s7\\metrics.json",
-      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k9_w01_ext4k_s11\\metrics.json",
-      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k9_w01_ext4k_s23\\metrics.json"
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h18_k11_w01_ext4k_s7\\metrics.json",
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h18_k11_w01_ext4k_s11\\metrics.json",
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h18_k11_w01_ext4k_s23\\metrics.json"
     ]
   },
   "three_seed_accuracy_alternative": {
@@ -168,6 +167,31 @@
       "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k5_w01_4k_s7\\metrics.json",
       "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k5_w01_4k_s11\\metrics.json",
       "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k5_w01_4k_s23\\metrics.json"
+    ]
+  },
+  "three_seed_9x9": {
+    "values": [
+      0.019381208345294,
+      0.01952911540865898,
+      0.01946086995303631
+    ],
+    "mean": 0.01945706456899643,
+    "std": 7.402692455506624e-05,
+    "pde_relative_rms": {
+      "values": [
+        0.28964775800704956,
+        0.2917223870754242,
+        0.2881467044353485
+      ],
+      "mean": 0.2898389498392741,
+      "std": 0.0017954922230872185
+    },
+    "parameters": 502468,
+    "trainable_parameters": 3913,
+    "paths": [
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k9_w01_ext4k_s7\\metrics.json",
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k9_w01_ext4k_s11\\metrics.json",
+      "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k9_w01_ext4k_s23\\metrics.json"
     ]
   }
 }

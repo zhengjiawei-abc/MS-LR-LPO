@@ -18,27 +18,27 @@
     },
     "pg_refiner": {
       "values": [
-        0.019381208345294,
-        0.01952911540865898,
-        0.01946086995303631
+        0.019639138132333755,
+        0.019470417872071266,
+        0.019552191719412804
       ],
-      "mean": 0.01945706456899643,
-      "std": 7.402692455506624e-05,
+      "mean": 0.019553915907939274,
+      "std": 8.437334398562525e-05,
       "pde_relative_rms": {
         "values": [
-          0.28964775800704956,
-          0.2917223870754242,
-          0.2881467044353485
+          0.2849162817001343,
+          0.2868279218673706,
+          0.28262269496917725
         ],
-        "mean": 0.2898389498392741,
-        "std": 0.0017954922230872185
+        "mean": 0.28478896617889404,
+        "std": 0.0021055023742052015
       },
-      "parameters": 502468,
-      "trainable_parameters": 3913,
+      "parameters": 502930,
+      "trainable_parameters": 4375,
       "paths": [
-        "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k9_w01_ext4k_s7\\metrics.json",
-        "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k9_w01_ext4k_s11\\metrics.json",
-        "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h24_k9_w01_ext4k_s23\\metrics.json"
+        "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h18_k11_w01_ext4k_s7\\metrics.json",
+        "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h18_k11_w01_ext4k_s11\\metrics.json",
+        "D:\\郑炜锋\\MovedFromC\\Desktop\\pinn_hybrid_demo_20261001\\experiments\\pg_physics_refiner\\burgers_h18_k11_w01_ext4k_s23\\metrics.json"
       ]
     },
     "pg_refiner_accuracy": {
@@ -88,7 +88,7 @@
     "truth_pde_relative_rms": 0.21322841942310333,
     "fno_test_mean": 0.024588,
     "welch_p_vs_pg": 0.00252089507914524,
-    "welch_p_refiner_vs_pino": 0.0016412832722040532
+    "welch_p_refiner_vs_pino": 0.0015714316083542269
   },
   "Advection beta=1": {
     "pg": {
