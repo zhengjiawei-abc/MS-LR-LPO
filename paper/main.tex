@@ -1,0 +1,109 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{microtype}
+
+\title{Physics-Guided Multi-Scale Low-Rank Latent PDE Operator}
+\author{Jiawei Zheng}
+\date{November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We study a physics-guided neural operator for parameterized one-dimensional
+partial differential equations. The operator combines a convolutional and
+Transformer context encoder, a low-rank latent PDE rollout, multi-scale skip
+features, and a grid decoder. Lightweight output-side PDE refiners can be
+attached without retraining the backbone. On PDEBench Burgers with
+$\nu=0.01$, the Burgers refiner reaches test L2 $0.022853$ and normalized PDE
+residual $0.244626$, compared with PINO's $0.024261$ and $0.253304$. A
+separate advection output refiner reaches test L2 $0.005789$ and residual
+$0.102403$ at $\beta=1$, compared with PINO's $0.006619$ and $0.104517$. An
+independent audit shows that the Burgers advantage is confined to boundary and
+overall residual: PINO remains better in the time interior and on a
+fourth-order residual. The advection advantage persists across overall,
+boundary, interior, and high-order residuals. Paired tests over 1,000 common
+test samples remain significant after Holm correction. Zero-shot Burgers
+transfer to $\nu=0.1$ fails, while the advection refiner transfers to
+$\beta\le 0.7$ but not to larger velocities.
+\end{abstract}
+
+\section{Introduction}
+Neural operators approximate solution maps rather than individual PDE
+solutions. Fourier neural operators (FNO) and DeepONet provide strong
+parameter-matched baselines \cite{li2021fno,lu2021deeponet}. Physics-informed
+variants add residual losses during training \cite{li2021pino}. We investigate
+whether a low-rank latent representation plus a small post-hoc physical
+correction can improve both data accuracy and physical consistency without
+large parameter growth.
+
+\section{Method}
+The backbone is
+\begin{equation}
+u_0(x) \rightarrow \text{context}
+\rightarrow z_0
+\rightarrow \text{latent PDE rollout}
+\rightarrow \text{low-rank decoder}
+\rightarrow u_n(x,t).
+\end{equation}
+For known constant periodic transport, we use an analytic prior
+$u_p(x,t)=u_0((x-\beta t)\bmod 1)$.
+
+The Burgers derivative refiner receives
+$\big[r/s,\ u_x/\mathrm{rms}(u_x),\ u_{xx}/\mathrm{rms}(u_{xx})\big]$,
+where $r=u_t+uu_x-\nu u_{xx}$. The advection output refiner receives the
+corresponding $r=u_t+\beta u_x$ features after analytic transport. Both use a
+zero-initialized $3\rightarrow h$, $1\times1$, SiLU, $h\rightarrow1$,
+$5\times5$ branch.
+
+\section{Experiments}
+\begin{table}[h]
+\centering
+\caption{Primary official-test results. Values are three-seed means.}
+\begin{tabular}{llrrr}
+\toprule
+Task & Model & L2 & residual & parameters \\
+\midrule
+Burgers & PG + refiner & 0.022853 & 0.244626 & 502,989 \\
+Burgers & PINO & 0.024261 & 0.253304 & 502,997 \\
+Advection $\beta=1$ & PG + refiner & 0.005789 & 0.102403 & 501,668 \\
+Advection $\beta=1$ & PINO & 0.006619 & 0.104517 & 503,165 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Residual audit.}
+For Burgers, the interior residual is $0.227397$ for PG and $0.221918$ for
+PINO; the fourth-order residual is $1.372452$ and $1.367258$, respectively.
+For advection $\beta=1$, PG is lower in overall, boundary, interior, and
+fourth-order residual. The paired-test Holm-adjusted $p$-values for the four
+primary comparisons range from $5.85\times10^{-10}$ to $1.26\times10^{-3}$.
+
+\paragraph{External checks.}
+On official Burgers $\nu=0.1$, zero-shot PG and FNO L2 are both about $0.39$,
+so the current model is not viscosity-general. The advection $\beta=1$
+refiner transfers to $\beta\le0.7$; larger $\beta$ requires a specialized
+branch.
+
+\section{Scope and Limitations}
+The current evidence supports a bounded claim: approximately 501K parameters,
+parameter-matched competitiveness with FNO, and carefully audited overall
+metrics against PINO. It does not support universal PDE solving, full NS
+momentum accuracy, or unrestricted inverse problems. Diffusion-sorption
+parameters were recovered from official metadata, but the current PG residual
+($0.999855$) remains above the observed-data residual ($0.531420$).
+
+\section{Conclusion}
+Low-rank latent PDE backbones and small output-side physics refiners provide a
+controlled way to trade data accuracy against physical residual. The most
+robust evidence is the audited advection $\beta=1$ result; Burgers requires a
+multi-viscosity training study, and diffusion-sorption requires a
+structure-level physical correction.
+
+\bibliographystyle{plain}
+\bibliography{references}
+\end{document}

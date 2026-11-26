@@ -105,13 +105,15 @@ def space_time_coordinates(
 def pde_residual_2d(
     prediction: torch.Tensor,
     coordinates: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
-    diffusion: tuple[float, float] = (1.0e-3, 5.0e-4),
-    reaction: tuple[float, float, float] = (0.04, 0.06, 0.0),
+    diffusion: tuple[float, float] = (1.0e-3, 5.0e-3),
+    reaction: float = 5.0e-3,
 ) -> torch.Tensor:
-    """Finite-difference Gray-Scott residual for two-channel predictions.
+    """PDEBench 2D diffusion-reaction residual.
 
-    prediction is [B, 2, X, Y, T]. The residual is diagnostic because the
-    public dataset does not expose per-sample reaction parameters.
+    The official dynamics are
+    u_t = Du lap(u) + u - u^3 - k - v
+    v_t = Dv lap(v) + u - v.
+    prediction is [B, 2, X, Y, T].
     """
     if prediction.size(1) != 2:
         raise ValueError("Gray-Scott residual expects exactly two channels")
@@ -153,10 +155,31 @@ def pde_residual_2d(
             dim=(1, 2, 3),
         )[1]
     )
-    feed, kill, _ = reaction
-    ru = du_dt - diffusion[0] * lap_u - (-u * v.square() + feed * (1.0 - u))
-    rv = dv_dt - diffusion[1] * lap_v - (u * v.square() - (feed + kill) * v)
+    ru = du_dt - diffusion[0] * lap_u - (u - u.pow(3) - reaction - v)
+    rv = dv_dt - diffusion[1] * lap_v - (u - v)
     return torch.stack([ru, rv], dim=1)
+
+
+def pde_residual_2d_relative(
+    prediction: torch.Tensor,
+    coordinates: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+) -> torch.Tensor:
+    residual = pde_residual_2d(prediction, coordinates)
+    u = prediction[:, 0]
+    v = prediction[:, 1]
+    x, y, t = coordinates
+    dx = float((x[-1] - x[0]) / max(x.numel() - 1, 1))
+    dy = float((y[-1] - y[0]) / max(y.numel() - 1, 1))
+    dt = float((t[-1] - t[0]) / max(t.numel() - 1, 1))
+    u_t = torch.gradient(u, spacing=(dx, dy, dt), dim=(1, 2, 3))[2]
+    v_t = torch.gradient(v, spacing=(dx, dy, dt), dim=(1, 2, 3))[2]
+    scale = (
+        u_t.square()
+        + v_t.square()
+        + (u - u.pow(3) - 5.0e-3 - v).square()
+        + (u - v).square()
+    ).flatten(1).mean(dim=1).clamp_min(1.0e-12)
+    return residual.square().flatten(1).mean(dim=1) / scale
 
 
 def incompressible_divergence(
@@ -199,3 +222,94 @@ def divergence_relative_loss(
     coordinates: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
 ) -> torch.Tensor:
     return divergence_relative_per_sample(prediction, coordinates).mean()
+
+
+def ns_momentum_divergence_relative(
+    prediction: torch.Tensor,
+    coordinates: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+    force: torch.Tensor | None = None,
+    particles: torch.Tensor | None = None,
+    viscosity: float = 0.01,
+) -> torch.Tensor:
+    """Divergence of the NS momentum equation after eliminating pressure.
+
+    prediction and force are [B, 2, X, Y, T] and particles is [B, X, Y, T].
+    Interior finite differences are used because the official solver applies
+    non-periodic velocity boundary conditions.
+    """
+    if prediction.size(1) < 2:
+        raise ValueError("NS residual expects u/v channels")
+    x, y, t = coordinates
+    dx = float((x[-1] - x[0]) / max(x.numel() - 1, 1))
+    dy = float((y[-1] - y[0]) / max(y.numel() - 1, 1))
+    dt = float((t[-1] - t[0]) / max(t.numel() - 1, 1))
+    u = prediction[:, :, 1:-1, 1:-1, 1:-1]
+    v = prediction[:, :, 1:-1, 1:-1, 1:-1]
+    center = prediction[:, :, 1:-1, 1:-1, 1:-1]
+    u_center = center[:, 0]
+    v_center = center[:, 1]
+    u_t = (
+        prediction[:, 0, 1:-1, 1:-1, 2:]
+        - prediction[:, 0, 1:-1, 1:-1, :-2]
+    ) / (2.0 * dt)
+    v_t = (
+        prediction[:, 1, 1:-1, 1:-1, 2:]
+        - prediction[:, 1, 1:-1, 1:-1, :-2]
+    ) / (2.0 * dt)
+    u_x = (
+        prediction[:, 0, 2:, 1:-1, 1:-1]
+        - prediction[:, 0, :-2, 1:-1, 1:-1]
+    ) / (2.0 * dx)
+    u_y = (
+        prediction[:, 0, 1:-1, 2:, 1:-1]
+        - prediction[:, 0, 1:-1, :-2, 1:-1]
+    ) / (2.0 * dy)
+    v_x = (
+        prediction[:, 1, 2:, 1:-1, 1:-1]
+        - prediction[:, 1, :-2, 1:-1, 1:-1]
+    ) / (2.0 * dx)
+    v_y = (
+        prediction[:, 1, 1:-1, 2:, 1:-1]
+        - prediction[:, 1, 1:-1, :-2, 1:-1]
+    ) / (2.0 * dy)
+    lap_u = (
+        prediction[:, 0, 2:, 1:-1, 1:-1]
+        - 2.0 * prediction[:, 0, 1:-1, 1:-1, 1:-1]
+        + prediction[:, 0, :-2, 1:-1, 1:-1]
+    ) / (dx * dx) + (
+        prediction[:, 0, 1:-1, 2:, 1:-1]
+        - 2.0 * prediction[:, 0, 1:-1, 1:-1, 1:-1]
+        + prediction[:, 0, 1:-1, :-2, 1:-1]
+    ) / (dy * dy)
+    lap_v = (
+        prediction[:, 1, 2:, 1:-1, 1:-1]
+        - 2.0 * prediction[:, 1, 1:-1, 1:-1, 1:-1]
+        + prediction[:, 1, :-2, 1:-1, 1:-1]
+    ) / (dx * dx) + (
+        prediction[:, 1, 1:-1, 2:, 1:-1]
+        - 2.0 * prediction[:, 1, 1:-1, 1:-1, 1:-1]
+        + prediction[:, 1, 1:-1, :-2, 1:-1]
+    ) / (dy * dy)
+    if force is None:
+        force_x = torch.zeros_like(u_t)
+        force_y = torch.zeros_like(v_t)
+    else:
+        if force.dim() == 4:
+            force = force.unsqueeze(-1).expand(-1, -1, -1, -1, u_t.size(-1))
+        force_x = force[:, 0, 1:-1, 1:-1, :]
+        force_y = force[:, 1, 1:-1, 1:-1, :]
+        if particles is not None:
+            rho = particles[:, 1:-1, 1:-1, 1:-1]
+            force_x = rho * force_x
+            force_y = rho * force_y
+    momentum_x = u_t + u_center * u_x + v_center * u_y - viscosity * lap_u - force_x
+    momentum_y = v_t + u_center * v_x + v_center * v_y - viscosity * lap_v - force_y
+    dmx_dx = (momentum_x[:, 2:] - momentum_x[:, :-2]) / (2.0 * dx)
+    dmy_dy = (momentum_y[:, :, 2:] - momentum_y[:, :, :-2]) / (2.0 * dy)
+    dmx_dx = dmx_dx[:, 1:-1, 2:-2]
+    dmy_dy = dmy_dy[:, 2:-2, 1:-1]
+    divergence = dmx_dx + dmy_dy
+    scale = (dmx_dx.square() + dmy_dy.square()).flatten(1).mean(
+        dim=1
+    ).clamp_min(1.0e-12)
+    return divergence.square().flatten(1).mean(dim=1) / scale

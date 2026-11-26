@@ -1,0 +1,17 @@
+{
+  "equation": "R(c)c_t = D c_xx",
+  "retardation": "1 + (1-por)/por * rho_s*k_f*n_f*c^(n_f-1)",
+  "parameters": {
+    "D": 0.0005,
+    "porosity": 0.29,
+    "rho_s": 2880.0,
+    "k_f": 0.00035,
+    "n_f": 0.874,
+    "t_final": 500.0
+  },
+  "evaluation_region": "interior x and time, excluding source and flux boundaries",
+  "test_relative_l2_pg": 0.0033298414200544357,
+  "truth_pde_relative_rms": 0.5314202308654785,
+  "pg_pde_relative_rms": 0.999854564666748,
+  "diagnostic_note": "Increasing local physics weight reduced residual but drove dev L2 above 0.02; no local refiner checkpoint was promoted."
+}

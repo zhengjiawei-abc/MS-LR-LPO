@@ -1,0 +1,41 @@
+{
+  "protocol": "Seed-7 common 1000-sample test split. Negative differences mean PG has lower error. Bootstrap resamples samples; Holm correction covers four primary claims.",
+  "comparisons": {
+    "Burgers/L2": {
+      "mean_difference": -0.0011078877141699195,
+      "ci95_low": -0.0017707851948216558,
+      "ci95_high": -0.0004301867447793484,
+      "paired_t_p": 0.0012619129847735167,
+      "wilcoxon_p": 5.717908152291784e-06,
+      "pg_better_fraction": 0.5750000476837158,
+      "holm_adjusted_p": 0.0012619129847735167
+    },
+    "Burgers/residual": {
+      "mean_difference": -0.01625990867614746,
+      "ci95_low": -0.021050384268164635,
+      "ci95_high": -0.011236934922635555,
+      "paired_t_p": 1.4617179688869442e-10,
+      "wilcoxon_p": 3.499238354165865e-23,
+      "pg_better_fraction": 0.6520000100135803,
+      "holm_adjusted_p": 5.846871875547777e-10
+    },
+    "Advection beta=1/L2": {
+      "mean_difference": -0.0007590652676299214,
+      "ci95_low": -0.0010077208280563354,
+      "ci95_high": -0.0004915600293315947,
+      "paired_t_p": 6.211499314900948e-09,
+      "wilcoxon_p": 0.0,
+      "pg_better_fraction": 0.8050000667572021,
+      "holm_adjusted_p": 1.2422998629801896e-08
+    },
+    "Advection beta=1/residual": {
+      "mean_difference": -0.0024998667649924755,
+      "ci95_low": -0.0033016162924468517,
+      "ci95_high": -0.001670606667175889,
+      "paired_t_p": 2.566595158626228e-09,
+      "wilcoxon_p": 0.0,
+      "pg_better_fraction": 0.9140000343322754,
+      "holm_adjusted_p": 7.699785475878684e-09
+    }
+  }
+}

@@ -16,7 +16,7 @@ PG-MS-LR-LPO 是一个面向参数化一维偏微分方程的物理引导神经�
 beta = 0.1, 0.2, 0.4, 0.7, 1.0, 2.0, 4.0, 7.0
 ```
 
-实验结果表明，在参数预算接近时，PG-MS-LR-LPO 在绝大多数已测设置中优于 FNO，并在所有已测设置中优于参数匹配 DeepONet，包括已完成的高监督版本。Burgers 新增导数感知 PDE 修正器：它保留 11×11 场值分支，并并联一个只含 59 个参数的残差分支，显式输入归一化 `r = u_t + u u_x - nu u_xx`、`u_x` 与 `u_xx`。三 seed 结果为 Test L2 `0.022853 ± 0.000123`、PDE residual `0.244626 ± 0.001483`，两项分别比参数匹配 PINO 的 `0.024261 / 0.253304` 低约 `5.8% / 3.4%`；Welch 检验为 `p=0.0177 / 0.0259`。总参数 `502,989`，比 PINO 少 8 个。Advection β=1 新增解析平移后的输出端物理修正器，三 seed 结果为 Test L2 `0.005789 ± 0.000110`、PDE residual `0.102403 ± 0.000327`，分别比 PINO 的 `0.006619 / 0.104517` 低约 `12.5% / 2.0%`；总参数 `501,668`。历史 3×3、5×5、9×9、11×11 修正器继续作为 Pareto 消融保留。将残差约束前移到 PG 主训练阶段的首轮实验没有优于后处理修正器。β=2、4、7 的最终残差阶段还完成了共享早期 checkpoint、仅改变最终微调 seed 的稳定性检查。β=7 仍是明确失败案例：三 seed 最终阶段均值为 `0.011357 ± 0.000008`，仍落后 FNO 的 `0.009003`。
+实验结果表明，在参数预算接近时，PG-MS-LR-LPO 在绝大多数已测设置中优于 FNO，并在所有已测设置中优于参数匹配 DeepONet，包括已完成的高监督版本。Burgers 新增导数感知 PDE 修正器：它保留 11×11 场值分支，并并联一个只含 59 个参数的残差分支，显式输入归一化 `r = u_t + u u_x - nu u_xx`、`u_x` 与 `u_xx`。三 seed 结果为 Test L2 `0.022853 ± 0.000123`、总体 PDE residual `0.244626 ± 0.001483`，两项分别比参数匹配 PINO 的 `0.024261 / 0.253304` 低约 `5.8% / 3.4%`。但独立审计发现 Burgers interior residual 和四阶差分 residual 仍落后 PINO，因此只能声明总体指标领先。Advection β=1 新增解析平移后的输出端物理修正器，三 seed 结果为 Test L2 `0.005789 ± 0.000110`、PDE residual `0.102403 ± 0.000327`，分别比 PINO 的 `0.006619 / 0.104517` 低约 `12.5% / 2.0%`，且在 overall、boundary、interior 和四阶 residual 上均领先。历史修正器、外部泛化和统计审计详见 `docs/EXPERIMENT_AUDIT_20261127.md`。
 
 2026-11-27 更新新增 Advection β=1 输出端物理修正器三 seed 结果，并把两个一维任务的 L2/PDE residual 双指标标准统一到 PINO 对比中。
 
@@ -180,6 +180,31 @@ u = u_n + ConvPDE(features)
 ```
 
 分支为 `3 -> 8, 1x1 -> SiLU -> 8 -> 1, 5x5`，最后卷积零初始化，共 233 个可训练参数。训练时冻结固定平移主干，以归一化 Advection residual 为物理损失，dev L2 上限设为入口值的 `1.30` 倍，并仍在预算内选择最低 residual。三 seed 总参数为 `501,668`。
+
+### 2.10 其他 PDE 物理残差修正
+
+官方 diffusion-sorption HDF5 的样本属性包含 `D=5e-4`、`por=0.29`、`rho_s=2880`、`k_f=3.5e-4`、`n_f=0.874`。物理残差按 Freundlich 阻滞模型计算：
+
+```text
+R(c)c_t = D c_xx
+R(c) = 1 + (1-por)/por * rho_s*k_f*n_f*c^(n_f-1)
+```
+
+只在不受左侧源项和右侧通量边界影响的 interior 上评分。
+
+2D diffusion-reaction 已改为 PDEBench 官方反应项：
+
+```text
+u_t = Du lap(u) + u - u^3 - k - v
+v_t = Dv lap(v) + u - v
+Du = 1e-3, Dv = 5e-3, k = 5e-3
+```
+
+NS 没有保存压力场，因此使用压力梯度消去后的动量散度缺陷：
+
+```text
+div(u_t + u grad(u) - nu lap(u) - particles*force) = 0
+```
 
 ## 3. 参数预算
 
@@ -428,7 +453,7 @@ Burgers 物理修正器使用冻结主干和零初始化二维卷积残差分支
 
 Burgers 上导数感知修正器仍比观测残差底噪 `0.213228` 高，但已经低于 PINO。Advection 上 PINO 的残差低于观测底噪，说明更平滑的解可以压低残差，但函数误差仍高于 PG。解析平移 PG 的残差与观测底噪完全一致，因此不能仅凭“残差更低”判断 PINO 更准确。
 
-当前可支持的结论是：在 Burgers 与 Advection β=1 的三 seed 设置中，学习型 PG 修正器同时取得低于 PINO 的 Test L2 和归一化 PDE residual。该结论不外推到 diffusion-sorption 或二维任务。
+当前可支持的结论是：Burgers 学习型修正器的总体 Test L2/residual 低于 PINO，但 interior 和四阶 residual 仍落后；Advection β=1 在 overall、boundary、interior 和高阶 residual 上均低于 PINO。该结论不外推到 diffusion-sorption 或二维任务。
 
 ### 5.10 主训练残差约束
 
@@ -446,6 +471,28 @@ Burgers 上导数感知修正器仍比观测残差底噪 `0.213228` 高，但已
 全程主干残差约束明显拖慢数据收敛，测试 PDE residual 也没有下降。原因是 PG 的潜空间和低分辨率解码器需要先形成稳定的数据表征，再接收差分残差梯度；过早反向传播会同时扰动编码器、潜空间推进和解码器。
 
 从已收敛的数据-only checkpoint 晚启用主训练残差更有效：三 seed 数据误差降到 `0.019183 ± 0.000037`，残差降到 `0.4470 ± 0.0001`，相对数据-only 分别改善约 `3.0%` 和 `7.7%`。后处理 11×11 修正器仍把残差降到 `0.284789`；导数分支进一步降到 `0.244626`，并保持 Test L2 低于 PINO。因此当前仍采用“数据表征预训练 + 输出端物理修正”的两阶段路线。
+
+### 5.11 残差可信度、统计与外部泛化
+
+Burgers 的总体 residual 优势主要来自时间边界：
+
+| residual | PG | PINO | 观测数据 |
+|---|---:|---:|---:|
+| overall | **0.244643** | 0.253297 | 0.213228 |
+| boundary | **0.634041** | 0.702292 | 0.492399 |
+| interior | 0.227397 | **0.221918** | 0.167455 |
+| fourth-order | 1.372452 | **1.367258** | 1.375831 |
+
+因此 Burgers 只能声明官方总体 residual 更低，不能声明内部或高阶物理一致性全面胜出。Advection β=1 则四项均低于 PINO。
+
+Seed-7 common 1000 样本的 paired bootstrap 与 Holm 校正在四个总体指标上均显著。统计、公式和外部数据细节见 `docs/EXPERIMENT_AUDIT_20261127.md`。
+
+外部验证暴露了两个明确边界：
+
+- Burgers `Nu=0.01` 模型零样本迁移到官方 `Nu=0.1` 时，PG/FNO L2 均约 `0.39`，当前模型不具备跨粘度泛化。
+- Advection β=1 输出修正器可零样本迁移到 β≤0.7；β≥2 应使用专用残差分支，β=7 仍落后 FNO。
+
+Diffusion-sorption 参数和 Freundlich residual 已恢复，但当前 PG residual `0.999855` 高于观测数据 `0.531420`，未通过物理约束。二维 diffusion-reaction 的正确 residual 为真值 `0.009507`、PG `0.034724`、FNO `0.136032`。NS 压力消去后的动量散度缺陷为真值 `1.305054`、PG `1.136847`、FNO `1.095111`，由于观测数据本身不接近零，只作为诊断。
 
 ## 6. 参数反演与可辨识性
 
@@ -502,6 +549,10 @@ Delta_beta approximately 1 / (dt * NX)
 - 全分辨率二维 NS、压力场、湍流和复杂几何。
 - 无先验通用参数反演。
 - 时变边界、源项和复杂几何。
+- Burgers 跨粘度零样本泛化；官方 `Nu=0.1` 外部验证明显失败。
+- Advection β≥2 的 β=1 修正器零样本迁移；这些区间需专用分支。
+- Diffusion-sorption 达到观测数据 residual 水平的物理一致性。
+- NS 的绝对动量平衡；当前压力消去指标仍受粗网格和交错量近似限制。
 - 生产级推理服务和不确定性保证。
 
 ## 8. 完成状态与条件性扩展
@@ -518,6 +569,10 @@ Delta_beta approximately 1 / (dt * NX)
 8. Burgers 轻量物理残差修正器三 seed；3×3、5×5、9×9、11×11 历史版本和导数感知版本已完成。导数分支新增 59 个参数，在总参数比 PINO 少 8 个的条件下同时降低 Test L2 和 PDE residual。
 9. PG 主训练循环已支持 PDE residual、物理权重预热和延迟启用；从零训练为负结果，晚启用三 seed 为小幅正结果。
 10. Advection β=1 解析平移后的输出端物理修正器三 seed 已完成；新增 233 个参数，同时低于 PINO 的 Test L2 和 PDE residual。
+11. Burgers/Advection 的 boundary、interior、四阶差分和谱残差审计已完成；Burgers interior 反例已披露。
+12. Seed-7 1000 样本 paired bootstrap、Wilcoxon 与 Holm 多重比较校正已完成。
+13. 官方 Burgers `Nu=0.1` 外部 test 与 Advection 八 β 零样本迁移已完成，泛化失败边界已记录。
+14. Diffusion-sorption Freundlich residual、二维 diffusion-reaction 官方残差和 NS 压力消去动量散度残差已完成，并记录各自限制。
 
 条件性扩展：
 
@@ -529,13 +584,15 @@ Delta_beta approximately 1 / (dt * NX)
 
 可声明：
 
-> 在 PDEBench 一维标量任务和项目内参数匹配基线上，PG-MS-LR-LPO 在绝大多数已测设置中优于 FNO，并在所有已测设置中优于参数匹配 DeepONet，包括已完成的高监督版本。Burgers 与 Advection β=1 的学习型物理修正器均在三 seed 上同时取得低于匹配 PINO 的 Test L2 和归一化 PDE residual。
+> 在 PDEBench 一维标量任务和项目内参数匹配基线上，PG-MS-LR-LPO 在绝大多数已测设置中优于 FNO，并在所有已测设置中优于参数匹配 DeepONet，包括已完成的高监督版本。Burgers 学习型修正器取得低于 PINO 的 Test L2 和总体 residual；Advection β=1 在 overall、boundary、interior 与四阶 residual 上均低于 PINO。样本级配对统计经 Holm 校正后支持四个总体差异。
 
 不可声明：
 
 > 已全面超过官方 PDEBench 的 FNO/DeepONet/PINO，或已经在所有任务上同时取得更低数据误差和更低 PDE 残差，或已经解决完整二维压力场 NS、湍流、逆问题和参数反演。
 
-PINO 对比的正确表述是：Burgers 导数感知修正器在三 seed 上 Test L2 为 `0.022853`、PDE residual 为 `0.244626`，均低于 PINO 的 `0.024261 / 0.253304`；Advection β=1 输出修正器为 `0.005789 / 0.102403`，均低于 PINO 的 `0.006619 / 0.104517`。该双指标声明仍不外推到其他 PDE。
+PINO 对比的正确表述是：Burgers 导数感知修正器总体 Test L2/PDE residual 为 `0.022853 / 0.244626`，低于 PINO 的 `0.024261 / 0.253304`，但 interior residual 和四阶 residual 仍落后；Advection β=1 输出修正器为 `0.005789 / 0.102403`，四项 residual 审计均优于 PINO。该声明不外推到其他 PDE。
+
+外部验证的正确表述是：Burgers 当前不具备跨粘度零样本泛化；Advection β=1 修正器只可零样本用于 β≤0.7；diffusion-sorption 和完整 NS 尚未达到可声明的物理残差优势。
 
 同时不能把“共享早期 checkpoint、仅最终阶段改变 seed”写成“从零独立训练三 seed”。当前正确表述是最终残差微调阶段三 seed。
 
@@ -560,8 +617,15 @@ PINO 对比的正确表述是：Burgers 导数感知修正器在三 seed 上 Tes
 | `code/run_pg_main_physics_queue.py` | 数据-only 预训练后晚启用主训练残差三 seed |
 | `analysis_plots_clean/compile_advection_eight.py` | 官方八个 β 三方结果汇总 |
 | `analysis_plots_clean/make_pino_comparison.py` | PG/PINO 数据精度与残差对比 |
+| `code/analyze_residual_credibility.py` | boundary/interior/高阶/谱残差审计 |
+| `code/analyze_paired_statistics.py` | 配对 bootstrap、Wilcoxon 与 Holm 校正 |
+| `code/analyze_2d_physics.py` | 修正 reaction 与压力消去 NS residual |
+| `code/evaluate_burgers_external_viscosity.py` | 外部粘度零样本验证 |
+| `code/evaluate_advection_refiner_generalization.py` | 八 β 零样本迁移 |
 | `code/evaluate_advection_beta_inference.py` | β 可辨识性诊断 |
 | `datasets/download_parallel.py` | 官方大文件分片续传与 MD5 校验 |
+| `datasets/http_hdf5.py` | curl range 远程 HDF5 reader |
+| `datasets/fetch_burgers_external.py` | 外部 Burgers test 抽样 |
 | `datasets/pdebench_advection_sources.json` | 官方八个 advection 文件来源 |
 | `datasets/pdebench_group_to_parquet.py` | 官方 HDF5 转换 |
 | `analysis_plots_clean/make_current_figures.py` | 主图 |
@@ -575,11 +639,11 @@ experiments/preserved_checkpoints_20261123/
 
 ## 11. 结论
 
-当前 PG-MS-LR-LPO 已经形成一套可复现的一维参数化 PDE 神经算子框架。其优势集中在已知物理先验与神经残差结合的部分，而不是对所有 PDE 的统一求解能力。官方 advection 八个 β 已全部补齐；残差分支最终阶段的三 seed 结果确认 β=2、4 的优势稳定存在，而 β=7 仍落后 FNO。Burgers 导数感知修正器在三 seed 上取得低于匹配 PINO 的 Test L2 和 PDE residual：`0.022853 / 0.244626` 对 `0.024261 / 0.253304`；Advection β=1 输出修正器也以 `0.005789 / 0.102403` 同时低于 PINO 的 `0.006619 / 0.104517`。把残差约束前移到主训练阶段的首轮实验未能优于输出端修正，说明当前数据-only 预训练加轻量物理后处理仍是更合适的两阶段方案。
+当前 PG-MS-LR-LPO 已经形成一套可复现的一维参数化 PDE 神经算子框架。其优势集中在已知物理先验与神经残差结合的部分，而不是对所有 PDE 的统一求解能力。官方 advection 八个 β 已全部补齐；残差分支最终阶段的三 seed 结果确认 β=2、4 的优势稳定存在，而 β=7 仍落后 FNO。Advection β=1 输出修正器以 `0.005789 / 0.102403` 在总体、边界、内部和高阶 residual 上均低于 PINO。Burgers 的总体 Test L2/residual 为 `0.022853 / 0.244626`，低于 PINO 的 `0.024261 / 0.253304`，但 interior 和四阶 residual 仍落后；Burgers 模型也不能零样本迁移到其他粘度。把残差约束前移到主训练阶段的首轮实验未能优于输出端修正，说明当前数据-only 预训练加轻量物理后处理仍是更合适的两阶段方案。
 
 最稳妥的论文定位是：
 
-> 面向一维周期 PDE 的物理引导低秩潜空间算子，在约 501K 参数下具备参数匹配 FNO 的竞争力；Burgers 与 Advection β=1 的学习型物理修正配置均在三个 seed 上同时取得低于匹配 PINO 的数据误差和 PDE 残差，并能通过物理平移与可学习残差扩展到参数化 advection。
+> 面向一维周期 PDE 的物理引导低秩潜空间算子，在约 501K 参数下具备参数匹配 FNO 的竞争力；Advection β=1 在三个 seed 上于总体、内部和高阶残差上优于 PINO。Burgers 的总体指标低於 PINO，但内部与跨粘度泛化仍有明确边界。
 
 二维扩展进一步表明，低秩潜空间加多尺度 skip 的轻量配置可在 245K–249K 参数下显著优于参数匹配 FNO/DeepONet；但推理效率仍明显落后于 FNO，完整压力场 NS 尚未完成。
 

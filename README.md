@@ -12,6 +12,14 @@
 PDF 版本见
 [PG-MS-LR-LPO 技术报告（PDF）](output/pdf/PG-MS-LR-LPO-Technical-Report.pdf)。
 
+独立残差、配对统计、外部泛化与物理公式审计见
+[实验审计与补充结果](docs/EXPERIMENT_AUDIT_20261127.md)。
+
+冻结配置、数据获取和统计协议见
+[复现实验协议](docs/REPRODUCIBILITY.md)。
+
+正式论文骨架见 [LaTeX manuscript](paper/main.tex)。
+
 多维 PDE 扩展、官方数据转换和训练命令见
 [多维 PDE 求解扩展](docs/MULTIDIMENSIONAL_PDE.md)。
 
@@ -36,14 +44,15 @@ advection β=1 上 PG `0.004543`，PINO `0.006619`。基础 PG 的残差仍落�
 
 Burgers 新增导数感知修正器后，三 seed 数据误差为
 `0.022853 ± 0.000123`、PDE 残差为 `0.244626 ± 0.001483`。两项分别比匹配 PINO
-的 `0.024261 / 0.253304` 低约 `5.8% / 3.4%`，Welch 检验分别为
-`p=0.0177 / 0.0259`。总参数 `502,989`，比 PINO 少 8 个。该版本是当前
-“数据精度与物理一致性同时优于 PINO”的标准配置。
+的 `0.024261 / 0.253304` 低约 `5.8% / 3.4%`。独立审计显示该 residual 优势主要
+来自时间边界，interior 和四阶 residual 仍落后 PINO，因此只能声明总体指标领先。
+总参数 `502,989`，比 PINO 少 8 个。
 
 Advection β=1 新增解析平移后的输出端物理修正器，三 seed 数据误差为
 `0.005789 ± 0.000110`、PDE 残差为 `0.102403 ± 0.000327`。两项分别比 PINO
 的 `0.006619 / 0.104517` 低约 `12.5% / 2.0%`，Welch 检验为
 `p=0.00098 / 0.00304`。总参数 `501,668`，比 PINO 少 1,497 个。
+Seed-7 的 1000 样本配对 bootstrap 与 Holm 校正也支持四个总体指标差异。
 
 历史修正器仍保留用于消融：3×3 精度优先版本训练 305 个参数，数据误差
 `0.018761 ± 0.000038`、残差 `0.3718`；11×11 两阶段版本训练 4,375 个参数，
@@ -336,8 +345,9 @@ Advection 输出修正器的 L2 与 residual 对 PINO 的 Welch 检验分别为
 `p=0.00098` 和 `p=0.00304`。它牺牲了一部分固定解析平移的超低 L2，
 但仍有足够余量同时低于 PINO 的两项指标。
 
-Burgers 和 Advection β=1 的推荐配置现在都同时低于 PINO 的数据误差和 PDE 残差。
-基础解析平移、历史 11×11 修正器和无修正器结果继续保留为消融对照。
+Burgers 的总体 Test L2 与官方 residual 低于 PINO，但残差审计显示 interior residual
+和四阶差分 residual 仍略落后 PINO，不能写成内部物理一致性全面胜出。Advection β=1
+的 overall、boundary、interior 和四阶 residual 均低于 PINO。
 
 ### 主训练残差约束
 
@@ -439,7 +449,8 @@ python datasets/pdebench_group_to_parquet.py \
 ```
 
 Diffusion-sorption 原始时间范围为 `0..500`。项目把 `101` 个均匀时间层映射到模型现有的
-`[0, 2]` 坐标域，仅用于数据-only 学习，不计算 Burgers 物理残差。
+`[0, 2]` 坐标域；物理审计使用原始 `dt=5` 和 Freundlich interior residual，而不是
+Burgers residual。
 
 ## 训练与复现
 
@@ -576,10 +587,17 @@ python code/run_pg_advection_output_refiner_queue.py \
 | `analysis_plots_clean/compile_advection_eight.py` | 官方八个 β 的三方结果汇总 |
 | `analysis_plots_clean/make_deeponet_supervision.py` | 三个 1D 任务的高监督 DeepONet 对比 |
 | `analysis_plots_clean/make_pino_comparison.py` | PG/PINO 数据精度与 PDE 残差对比 |
+| `code/analyze_residual_credibility.py` | 边界、内部、高阶和谱残差审计 |
+| `code/analyze_paired_statistics.py` | 逐样本配对 bootstrap 与 Holm 校正 |
+| `code/analyze_2d_physics.py` | 修正二维 reaction 与压力消去 NS momentum residual |
+| `code/evaluate_burgers_external_viscosity.py` | 官方 `Nu=0.1` 外部零样本验证 |
+| `code/evaluate_advection_refiner_generalization.py` | 八个官方 β 的零样本迁移 |
 | `code/evaluate_advection_beta_inference.py` | advection β 多参数反演与离散可辨识性诊断 |
 | `code/burgers_common.py` | 数据读取、split 解析、误差与坐标工具 |
 | `datasets/pdebench_group_to_parquet.py` | 分组和整块 tensor 两种 PDEBench 1D HDF5 转换 |
 | `datasets/download_parallel.py` | 大文件 HTTP Range 分片续传与 MD5 校验 |
+| `datasets/http_hdf5.py` | 通过 curl range 直接读取远程 HDF5 |
+| `datasets/fetch_burgers_external.py` | 只取官方外部 Burgers test 样本 |
 | `datasets/pdebench_advection_sources.json` | 官方八个 advection 文件 URL 与 MD5 |
 | `code/coord_attention_operator_2d.py` | 二维潜空间谱 PDE、多尺度编码和分解式时空解码 |
 | `code/train_operator_2d.py` | PG/FNO/DeepONet 二维统一训练、相对时刻损失和早停 |
@@ -601,21 +619,24 @@ python code/run_pg_advection_output_refiner_queue.py \
 - β=2、4、7 的可学习残差仅完成最终阶段三 seed；早期 checkpoint 仍共享。
 - 周期平移分支只适用于已知常速、周期边界的线性平流。
 - 高 beta 下定点平移受离散插值误差限制，需要使用可学习残差分支。
-- Diffusion-sorption 使用归一化时间坐标，不能直接复用 Burgers PDE residual。
+- Diffusion-sorption 的 Freundlich 参数已从官方 HDF5 恢复，并加入正确 interior
+  residual；当前 PG Test L2 `0.003330`，但 residual `0.999855` 高于观测数据
+  `0.531420`，尚未通过物理约束。
 - 当前模型训练成本明显高于 FNO 和 DeepONet。
-- Burgers 和 Advection β=1 的学习型物理修正器均在三 seed 上同时优于 PINO 的
-  数据 L2 和 PDE residual；该结论不外推到 diffusion-sorption 或二维任务。
-- 导数/输出分支只验证 Burgers `Nu=0.01` 与 Advection β=1；其他 PDE 需要按
-  各自方程重新定义特征和离散 residual。
+- Burgers 的总体 L2/residual 与 Advection β=1 的四项 residual 审计均优于 PINO；
+  Burgers interior 与四阶 residual 仍落后 PINO。
+- 1000 样本 paired bootstrap 与 Holm 校正支持四个总体差异，但不能替代内部区审计。
+- Burgers 模型零样本迁移到官方 `Nu=0.1` 时 L2 约 `0.39`，不具备跨粘度泛化。
+- Advection β=1 输出修正器可零样本迁移到 β≤0.7；β≥2 应使用专用残差分支，
+  β=7 仍落后 FNO。
 - 二维 diffusion-reaction 当前从 `t=10` 的可辨识状态推进；从随机噪声 `t=0`
   直接预测全过程会出现严重信息损失，不能称为已解决该病态设定。
 - 二维实验使用 `64 x 64 x 41` 的降采样轨迹，尚未覆盖全分辨率、二维 NS、
   湍流或复杂边界。
-- 二维正式结果尚未加入观测场 Gray-Scott 物理残差；官方样本配置缺少完整
-  反应项参数，因此当前“PDE”指潜空间谱演化，而不是完整二维 PINN 残差约束。
-- NS 已加入速度散度约束，并显式输入 `(f_x, f_y)` 外力，但官方文件没有
-  压力场，因此尚未加入完整 NS 动量方程残差；结果也只覆盖 `64 x 64` 和
-  四条官方轨迹。
+- 二维 diffusion-reaction 已按官方 `u-u^3-k-v / u-v` 方程修正 residual：
+  真值 `0.009507`、PG `0.034724`、FNO `0.136032`，但仍只覆盖 `t=10` 状态推进。
+- NS 已加入“消去压力梯度后的动量散度缺陷”，真值 `1.305054`、PG `1.136847`、
+  FNO `1.095111`；真值本身不接近零，因此只作为诊断，不声明绝对物理正确性。
 - 当前 NS 文件固定 `NU=0.01` 和 `force_scale=0.15`，四条轨迹没有参数标签
   变化，因此不能据此外报二维 NS 标量参数反演；需要额外参数化轨迹。
 - 二维最终轻量配置去掉非线性潜空间谱混合块，保留 Fourier 线性推进和
@@ -630,5 +651,7 @@ python code/run_pg_advection_output_refiner_queue.py \
 
 zhengjiawei-abc  
 1103493759@qq.com
+
+许可证见 [MIT License](LICENSE)，引用元数据见 [CITATION.cff](CITATION.cff)。
 
 最后更新：2026-11-27

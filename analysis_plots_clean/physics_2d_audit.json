@@ -1,0 +1,16 @@
+{
+  "diffusion_reaction": {
+    "truth": 0.009507319889962673,
+    "pg": 0.03472414240241051,
+    "fno": 0.136031836271286
+  },
+  "incompressible_ns": {
+    "truth": 1.3050537109375,
+    "pg": 1.1368473768234253,
+    "fno": 1.0951108932495117
+  },
+  "notes": {
+    "diffusion_reaction": "PDEBench form: u_t=Du*lap(u)+u-u^3-k-v, v_t=Dv*lap(v)+u-v; Du=1e-3, Dv=5e-3, k=5e-3.",
+    "incompressible_ns": "Divergence of momentum equation with pressure eliminated; source-file particle density and force are used."
+  }
+}

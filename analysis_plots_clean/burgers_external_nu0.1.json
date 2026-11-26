@@ -1,0 +1,12 @@
+{
+  "pg_derivative_refiner": {
+    "test_l2": 0.38975927233695984,
+    "pde_relative_rms": 0.9660502076148987
+  },
+  "fno": {
+    "test_l2": 0.39320406317710876,
+    "pde_relative_rms": 0.9570429921150208
+  },
+  "truth_pde_relative_rms": 0.7495723962783813,
+  "protocol": "Official PDEBench Burgers Nu=0.1 test split, zero-shot from models trained only on Nu=0.01. No test tuning."
+}

@@ -1,0 +1,53 @@
+{
+  "protocol": "Zero-shot transfer of the beta=1, seed-7 output refiner. Only the transport velocity and PDE beta are changed; no test-set tuning or retraining is performed.",
+  "results": {
+    "beta0.1": {
+      "fixed_l2": 0.0011535673402249813,
+      "refiner_l2": 0.0017166241304948926,
+      "fixed_pde_relative_rms": 0.05149612948298454,
+      "refiner_pde_relative_rms": 0.05215977132320404
+    },
+    "beta0.2": {
+      "fixed_l2": 0.001644843490794301,
+      "refiner_l2": 0.002080762991681695,
+      "fixed_pde_relative_rms": 0.050125475972890854,
+      "refiner_pde_relative_rms": 0.048590149730443954
+    },
+    "beta0.4": {
+      "fixed_l2": 0.0025473427958786488,
+      "refiner_l2": 0.002820021705701947,
+      "fixed_pde_relative_rms": 0.05783211439847946,
+      "refiner_pde_relative_rms": 0.054129112511873245
+    },
+    "beta0.7": {
+      "fixed_l2": 0.003762030741199851,
+      "refiner_l2": 0.004551514983177185,
+      "fixed_pde_relative_rms": 0.08809206634759903,
+      "refiner_pde_relative_rms": 0.07400935888290405
+    },
+    "beta1": {
+      "fixed_l2": 0.004542579408735037,
+      "refiner_l2": 0.0057766251266002655,
+      "fixed_pde_relative_rms": 0.1263720840215683,
+      "refiner_pde_relative_rms": 0.1023351326584816
+    },
+    "beta2": {
+      "fixed_l2": 0.008303921669721603,
+      "refiner_l2": 0.00958386529237032,
+      "fixed_pde_relative_rms": 0.25602880120277405,
+      "refiner_pde_relative_rms": 0.23603555560112
+    },
+    "beta4": {
+      "fixed_l2": 0.01798674836754799,
+      "refiner_l2": 0.018042471259832382,
+      "fixed_pde_relative_rms": 0.5479825139045715,
+      "refiner_pde_relative_rms": 0.5418660640716553
+    },
+    "beta7": {
+      "fixed_l2": 0.03374824300408363,
+      "refiner_l2": 0.033179283142089844,
+      "fixed_pde_relative_rms": 0.8506118059158325,
+      "refiner_pde_relative_rms": 0.8484121561050415
+    }
+  }
+}

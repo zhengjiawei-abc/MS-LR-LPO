@@ -12,7 +12,11 @@ import torch
 
 from burgers_common import count_parameters, load_split, relative_l2, set_seed
 from coord_attention_operator import CoordAttentionOperator, OperatorConfig
-from pde_residual_1d import normalized_pde_residual
+from pde_residual_1d import (
+    high_order_pde_residual_region,
+    normalized_pde_residual,
+    normalized_pde_residual_region,
+)
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -46,11 +50,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--weight-decay", type=float, default=1.0e-4)
     parser.add_argument("--physics-weight", type=float, default=5.0e-4)
     parser.add_argument("--physics-warmup", type=int, default=500)
+    parser.add_argument(
+        "--physics-region",
+        choices=("full", "interior", "mixed", "high_order"),
+        default="full",
+    )
     parser.add_argument("--score-weight", type=float, default=0.01)
     parser.add_argument("--max-l2-increase", type=float, default=0.05)
     parser.add_argument("--eval-every", type=int, default=500)
     parser.add_argument("--seed", type=int, default=7)
-    parser.add_argument("--equation", choices=("burgers", "advection"), default="burgers")
+    parser.add_argument(
+        "--equation",
+        choices=("burgers", "advection", "diffusion_sorption"),
+        default="burgers",
+    )
     parser.add_argument("--pde-beta", type=float, default=1.0)
     parser.add_argument("--physics-refiner", action="store_true")
     parser.add_argument("--refiner-hidden", type=int, default=16)
@@ -63,7 +76,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-refiner-kernel", type=int, default=5)
     parser.add_argument(
         "--refiner-equation",
-        choices=("burgers", "advection"),
+        choices=("burgers", "advection", "diffusion_sorption"),
         default="burgers",
     )
     parser.add_argument("--refiner-beta", type=float, default=1.0)
@@ -96,12 +109,34 @@ def evaluate(
     device: torch.device,
     equation: str,
     beta: float,
+    region: str,
 ) -> dict:
     prediction = predict(model, fields, device)
-    residual = normalized_pde_residual(prediction, equation, beta)[1]
+    full_residual = normalized_pde_residual(prediction, equation, beta)[1]
+    interior_residual = normalized_pde_residual_region(
+        prediction,
+        equation,
+        beta,
+    )[1]
+    if region == "interior":
+        residual = interior_residual
+    elif region == "high_order":
+        residual = high_order_pde_residual_region(
+            prediction,
+            equation,
+        )[1]
+    elif region == "mixed":
+        residual = 0.5 * (full_residual + interior_residual)
+    else:
+        residual = full_residual
     return {
         "l2": relative_l2(prediction, fields[..., 0]),
         "pde_relative_rms": float(residual),
+        "pde_full_relative_rms": float(full_residual),
+        "pde_interior_relative_rms": float(interior_residual),
+        "pde_high_order_relative_rms": float(
+            high_order_pde_residual_region(prediction, equation)[1]
+        ),
     }
 
 
@@ -174,13 +209,33 @@ def main() -> None:
         args.data_dir / f"{args.dataset_prefix}_test.parquet",
         1000,
     ).to(device)
-    truth_pde = float(
-        normalized_pde_residual(
-            test[..., 0],
-            args.equation,
-            args.pde_beta,
-        )[1]
+    truth_full = normalized_pde_residual(
+        test[..., 0],
+        args.equation,
+        args.pde_beta,
+    )[1]
+    truth_interior = normalized_pde_residual_region(
+        test[..., 0],
+        args.equation,
+        args.pde_beta,
+    )[1]
+    truth_residual = (
+        truth_interior
+        if args.physics_region == "interior"
+        else (
+            0.5 * (truth_full + truth_interior)
+            if args.physics_region == "mixed"
+            else (
+                high_order_pde_residual_region(
+                    test[..., 0],
+                    args.equation,
+                )[1]
+                if args.physics_region == "high_order"
+                else truth_full
+            )
+        )
     )
+    truth_pde = float(truth_residual)
 
     initial_dev = evaluate(
         model,
@@ -188,6 +243,7 @@ def main() -> None:
         device,
         args.equation,
         args.pde_beta,
+        args.physics_region,
     )
     print(f"initial dev={initial_dev} truth_pde={truth_pde:.6f}", flush=True)
 
@@ -221,11 +277,32 @@ def main() -> None:
         target = train[indices, :, :, 0]
         prediction = model.forward_grid(target[:, :, 0])
         data_loss = torch.mean((prediction - target) ** 2)
-        pde_loss, pde_relative = normalized_pde_residual(
+        full_pde_loss, full_pde_relative = normalized_pde_residual(
             prediction,
             args.equation,
             args.pde_beta,
         )
+        interior_pde_loss, interior_pde_relative = (
+            normalized_pde_residual_region(
+                prediction,
+                args.equation,
+                args.pde_beta,
+            )
+        )
+        if args.physics_region == "interior":
+            pde_loss = interior_pde_loss
+            pde_relative = interior_pde_relative
+        elif args.physics_region == "high_order":
+            pde_loss, pde_relative = high_order_pde_residual_region(
+                prediction,
+                args.equation,
+            )
+        elif args.physics_region == "mixed":
+            pde_loss = full_pde_loss + interior_pde_loss
+            pde_relative = 0.5 * (full_pde_relative + interior_pde_relative)
+        else:
+            pde_loss = full_pde_loss
+            pde_relative = full_pde_relative
         ramp = min(1.0, (step + 1) / max(args.physics_warmup, 1))
         loss = data_loss + args.physics_weight * ramp * pde_loss
         optimizer.zero_grad(set_to_none=True)
@@ -241,6 +318,7 @@ def main() -> None:
                 device,
                 args.equation,
                 args.pde_beta,
+                args.physics_region,
             )
             score = (
                 dev_metrics["l2"]
@@ -283,6 +361,7 @@ def main() -> None:
         device,
         args.equation,
         args.pde_beta,
+        args.physics_region,
     )
     final_test = evaluate(
         model,
@@ -290,6 +369,7 @@ def main() -> None:
         device,
         args.equation,
         args.pde_beta,
+        args.physics_region,
     )
     result = {
         "source_checkpoint": str(args.source_checkpoint),
@@ -313,6 +393,7 @@ def main() -> None:
             "weight_decay": args.weight_decay,
             "physics_weight": args.physics_weight,
             "physics_warmup": args.physics_warmup,
+            "physics_region": args.physics_region,
             "score_weight": args.score_weight,
             "max_l2_increase": args.max_l2_increase,
             "seed": args.seed,

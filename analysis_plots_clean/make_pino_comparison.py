@@ -647,7 +647,7 @@ def main() -> None:
     fig.suptitle(
         "PG-MS-LR-LPO versus matched PINO\n"
         "PINO: three seeds, same FNO backbone and 24K steps; "
-        "PG learned refiner: three seeds",
+        "PG learned refiner: three seeds; Burgers is overall-residual only",
         fontsize=14,
         fontweight="bold",
         linespacing=1.35,
