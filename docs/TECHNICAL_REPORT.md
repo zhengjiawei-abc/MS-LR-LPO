@@ -492,6 +492,10 @@ Seed-7 common 1000 样本的 paired bootstrap 与 Holm 校正在四个总体指�
 - Burgers `Nu=0.01` 模型零样本迁移到官方 `Nu=0.1` 时，PG/FNO L2 均约 `0.39`，当前模型不具备跨粘度泛化。
 - Advection β=1 输出修正器可零样本迁移到 β≤0.7；β≥2 应使用专用残差分支，β=7 仍落后 FNO。
 
+进一步加入 192 参数粘度条件向量并联合微调后，`Nu=0.1` test L2 降到 `0.038765`，
+但 `Nu=0.01` 从原模型 `0.0197` 退到 `0.026376`。0.2 distillation 只略微改善原粘度，
+同时把新粘度 L2 拉到 `0.047423`。因此粘度条件明显有效，但当前不是无损多粘度替代。
+
 Diffusion-sorption 参数和 Freundlich residual 已恢复，但当前 PG residual `0.999855` 高于观测数据 `0.531420`，未通过物理约束。二维 diffusion-reaction 的正确 residual 为真值 `0.009507`、PG `0.034724`、FNO `0.136032`。NS 压力消去后的动量散度缺陷为真值 `1.305054`、PG `1.136847`、FNO `1.095111`，由于观测数据本身不接近零，只作为诊断。
 
 ## 6. 参数反演与可辨识性
@@ -620,6 +624,7 @@ PINO 对比的正确表述是：Burgers 导数感知修正器总体 Test L2/PDE 
 | `code/analyze_residual_credibility.py` | boundary/interior/高阶/谱残差审计 |
 | `code/analyze_paired_statistics.py` | 配对 bootstrap、Wilcoxon 与 Holm 校正 |
 | `code/analyze_2d_physics.py` | 修正 reaction 与压力消去 NS residual |
+| `code/finetune_multiviscosity_burgers.py` | Burgers 粘度条件联合微调 |
 | `code/evaluate_burgers_external_viscosity.py` | 外部粘度零样本验证 |
 | `code/evaluate_advection_refiner_generalization.py` | 八 β 零样本迁移 |
 | `code/evaluate_advection_beta_inference.py` | β 可辨识性诊断 |

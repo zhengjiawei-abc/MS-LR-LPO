@@ -1,0 +1,26 @@
+{
+  "task": "Burgers multi-viscosity fine-tuning",
+  "source_model": "Nu=0.01 seed 7 checkpoint",
+  "training_data": {
+    "nu0.01": "official train first 8000 samples",
+    "nu0.1": "official train samples 1000:3000"
+  },
+  "selection": "dev average L2 over Nu=0.01 and Nu=0.1; test not used",
+  "parameter_count": 498747,
+  "viscosity_embedding_parameters": 192,
+  "zero_shot": {
+    "nu0.1_l2_pg": 0.38975927233695984,
+    "nu0.1_l2_fno": 0.39320406317710876
+  },
+  "conditional_no_distillation": {
+    "steps": 6000,
+    "nu0.01_test_l2": 0.026375940069556236,
+    "nu0.1_test_l2": 0.038765471428632736
+  },
+  "conditional_distilled_0.2": {
+    "steps": 4000,
+    "nu0.01_test_l2": 0.026216182857751846,
+    "nu0.1_test_l2": 0.04742284119129181
+  },
+  "conclusion": "Viscosity conditioning dramatically improves unseen-viscosity accuracy, but the joint model still trades away some original Nu=0.01 accuracy and is not a lossless multi-viscosity replacement."
+}

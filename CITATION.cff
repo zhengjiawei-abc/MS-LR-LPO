@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use this repository, please cite the software release."
 title: "PG-MS-LR-LPO: Physics-Guided Multi-Scale Low-Rank Latent PDE Operator"
 type: software
-version: 0.2.0
+version: 0.3.0
 date-released: 2026-11-27
 license: MIT
 repository-code: "https://github.com/zhengjiawei-abc/PG-MS-LR-LPO"

@@ -305,6 +305,7 @@ PG 对 FNO 的 Welch p 为 `5.37e-9`，对高监督 DeepONet 为 `0.0266`。
 | PG + 11×11 两阶段修正器 | 502,930 | Burgers 历史残差版本；新增 4,375 个可训练参数 |
 | PG + 导数感知修正器 | 502,989 | Burgers 双指标标准；新增 4,434 个可训练参数，比 PINO 少 8 个 |
 | PG + advection 输出修正器 | 501,668 | β=1 双指标标准；新增 233 个可训练参数 |
+| PG + Burgers 粘度条件 | 498,747 | `Nu=0.01/0.1` 联合模型；新增 192 个条件参数 |
 
 固定平移分支不使用可训练参数；可学习残差融合只增加 1 个标量。Burgers 表中新模型使用
 rank16 checkpoint，向 rank17 的零扩展不会改变前向函数，因此与 `501,435` 输出严格一致。
@@ -590,6 +591,7 @@ python code/run_pg_advection_output_refiner_queue.py \
 | `code/analyze_residual_credibility.py` | 边界、内部、高阶和谱残差审计 |
 | `code/analyze_paired_statistics.py` | 逐样本配对 bootstrap 与 Holm 校正 |
 | `code/analyze_2d_physics.py` | 修正二维 reaction 与压力消去 NS momentum residual |
+| `code/finetune_multiviscosity_burgers.py` | Burgers `Nu=0.01/0.1` 粘度条件联合微调 |
 | `code/evaluate_burgers_external_viscosity.py` | 官方 `Nu=0.1` 外部零样本验证 |
 | `code/evaluate_advection_refiner_generalization.py` | 八个官方 β 的零样本迁移 |
 | `code/evaluate_advection_beta_inference.py` | advection β 多参数反演与离散可辨识性诊断 |
@@ -626,7 +628,9 @@ python code/run_pg_advection_output_refiner_queue.py \
 - Burgers 的总体 L2/residual 与 Advection β=1 的四项 residual 审计均优于 PINO；
   Burgers interior 与四阶 residual 仍落后 PINO。
 - 1000 样本 paired bootstrap 与 Holm 校正支持四个总体差异，但不能替代内部区审计。
-- Burgers 模型零样本迁移到官方 `Nu=0.1` 时 L2 约 `0.39`，不具备跨粘度泛化。
+- Burgers 原模型零样本迁移到官方 `Nu=0.1` 时 L2 约 `0.39`。加入 192 参数
+  粘度条件并联合微调后可降到 `0.0388`，但 `Nu=0.01` 从 `0.0198` 退到 `0.0264`；
+  目前是多粘度可用，但不是无损替代。
 - Advection β=1 输出修正器可零样本迁移到 β≤0.7；β≥2 应使用专用残差分支，
   β=7 仍落后 FNO。
 - 二维 diffusion-reaction 当前从 `t=10` 的可辨识状态推进；从随机噪声 `t=0`

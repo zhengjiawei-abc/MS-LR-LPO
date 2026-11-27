@@ -14,6 +14,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--start", type=int, default=0)
     parser.add_argument("--samples", type=int, default=1000)
     parser.add_argument("--t-stride", type=int, default=2)
     parser.add_argument("--x-stride", type=int, default=4)
@@ -27,12 +28,13 @@ def main() -> None:
         time = np.asarray(source["t-coordinate"][...], dtype=np.float32)
         x = np.asarray(source["x-coordinate"][...], dtype=np.float32)
         fields = []
-        for start in range(0, args.samples, args.batch_size):
-            stop = min(start + args.batch_size, args.samples)
+        stop_all = args.start + args.samples
+        for start in range(args.start, stop_all, args.batch_size):
+            stop = min(start + args.batch_size, stop_all)
             raw = np.asarray(tensor[start:stop], dtype=np.float32)
             selected = raw[:, :: args.t_stride, :: args.x_stride]
             fields.append(selected.transpose(0, 2, 1)[..., None])
-            print(f"fetched {stop}/{args.samples}", flush=True)
+            print(f"fetched {stop - args.start}/{args.samples}", flush=True)
         data = np.concatenate(fields, axis=0)
         attributes = {
             key: float(value)
@@ -45,6 +47,7 @@ def main() -> None:
         "source": args.url,
         "source_shape": source_shape,
         "samples": int(data.shape[0]),
+        "source_start": args.start,
         "output_shape": list(data.shape[1:]),
         "time_range": [float(time[0]), float(time[-1])],
         "x_range": [float(x[0]), float(x[-1])],

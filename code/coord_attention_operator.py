@@ -17,7 +17,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from burgers_common import NT, NX, T_FINAL, X_LENGTH
+from burgers_common import NT, NU, NX, T_FINAL, X_LENGTH
 from pde_residual_1d import normalized_pde_feature_channels
 
 
@@ -65,6 +65,7 @@ class OperatorConfig:
     grid_output_physics_refiner: bool = False
     grid_output_physics_refiner_hidden: int = 0
     grid_output_physics_refiner_kernel: int = 5
+    viscosity_conditioning: bool = False
 
 
 class CoordinateEmbedding(nn.Module):
@@ -583,6 +584,14 @@ class CoordAttentionOperator(nn.Module):
                 self.grid_output_physics_refiner[-1].weight
             )
             nn.init.zeros_(self.grid_output_physics_refiner[-1].bias)
+        self.viscosity_embedding = (
+            nn.Linear(2, cfg.d_model)
+            if cfg.viscosity_conditioning
+            else None
+        )
+        if self.viscosity_embedding is not None:
+            nn.init.zeros_(self.viscosity_embedding.weight)
+            nn.init.zeros_(self.viscosity_embedding.bias)
         self.blocks = (
             None
             if grid_mode
@@ -674,10 +683,27 @@ class CoordAttentionOperator(nn.Module):
         kv, trajectory = self.encode(u0)
         return self.decode(kv, x, t, trajectory)
 
-    def forward_grid(self, u0: torch.Tensor) -> torch.Tensor:
+    def forward_grid(
+        self,
+        u0: torch.Tensor,
+        viscosity: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         if self.grid_decoder is None:
             raise ValueError("grid decoder is not enabled")
         context, trajectory, skip_features = self.encode_with_skips(u0)
+        if self.viscosity_embedding is not None:
+            if viscosity is None:
+                viscosity = torch.full(
+                    (u0.size(0),),
+                    NU,
+                    device=u0.device,
+                    dtype=u0.dtype,
+                )
+            log_ratio = torch.log(viscosity / NU).unsqueeze(-1)
+            condition = self.viscosity_embedding(
+                torch.cat([log_ratio, log_ratio.square()], dim=-1)
+            )
+            context = context + condition.unsqueeze(1)
         field = self.grid_decoder(trajectory, context, skip_features)
         if self.grid_physics_refiner is not None:
             correction = self.grid_physics_refiner(

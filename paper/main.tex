@@ -84,10 +84,11 @@ fourth-order residual. The paired-test Holm-adjusted $p$-values for the four
 primary comparisons range from $5.85\times10^{-10}$ to $1.26\times10^{-3}$.
 
 \paragraph{External checks.}
-On official Burgers $\nu=0.1$, zero-shot PG and FNO L2 are both about $0.39$,
-so the current model is not viscosity-general. The advection $\beta=1$
-refiner transfers to $\beta\le0.7$; larger $\beta$ requires a specialized
-branch.
+On official Burgers $\nu=0.1$, zero-shot PG and FNO L2 are both about $0.39$.
+A 192-parameter viscosity-conditioned joint fine-tune reduces the new
+viscosity L2 to $0.0388$, but degrades the original $\nu=0.01$ L2 from $0.0197$
+to $0.0264$. The advection $\beta=1$ refiner transfers to $\beta\le0.7$;
+larger $\beta$ requires a specialized branch.
 
 \section{Scope and Limitations}
 The current evidence supports a bounded claim: approximately 501K parameters,

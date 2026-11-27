@@ -57,6 +57,9 @@ code\.venv\Scripts\python.exe code\analyze_2d_physics.py
 External generalization:
 
 ```powershell
+code\.venv\Scripts\python.exe code\finetune_multiviscosity_burgers.py `
+  --steps 6000 --batch-size 64 --lr 0.0001 --eval-every 250 --seed 7
+
 code\.venv\Scripts\python.exe code\evaluate_burgers_external_viscosity.py
 code\.venv\Scripts\python.exe code\evaluate_advection_refiner_generalization.py
 ```
@@ -85,6 +88,7 @@ code\.venv\Scripts\python.exe code\evaluate_advection_refiner_generalization.py
 - `analysis_plots_clean/residual_credibility.json`
 - `analysis_plots_clean/paired_statistics.json`
 - `analysis_plots_clean/burgers_external_nu0.1.json`
+- `analysis_plots_clean/burgers_multiviscosity.json`
 - `analysis_plots_clean/advection_refiner_generalization.json`
 - `analysis_plots_clean/physics_2d_audit.json`
 - `analysis_plots_clean/diffusion_sorption_audit.json`
